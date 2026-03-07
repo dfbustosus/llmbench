@@ -13,6 +13,7 @@ export interface TestCase {
 	datasetId: string;
 	input: string;
 	expected: string;
+	messages?: import("./provider.js").ChatMessage[];
 	context?: Record<string, unknown>;
 	tags?: string[];
 	orderIndex: number;
