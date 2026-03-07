@@ -8,7 +8,7 @@ import { serveCommand } from "./commands/serve.js";
 
 const program = new Command();
 
-program.name("llmbench").description("LLM Benchmarking & Evaluation Platform").version("0.1.2");
+program.name("llmbench").description("LLM Benchmarking & Evaluation Platform").version("0.1.3");
 
 program.addCommand(initCommand);
 program.addCommand(runCommand);
