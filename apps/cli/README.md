@@ -3,10 +3,10 @@
 **Evaluate, compare, and benchmark LLMs from your terminal.**
 
 ```bash
-npx llmbench init
+npx @llmbench/cli init
 export OPENAI_API_KEY=sk-...
-npx llmbench run -d datasets/example.json
-npx llmbench serve
+npx @llmbench/cli run -d datasets/example.json
+npx @llmbench/cli serve
 ```
 
 ## Features

@@ -1,6 +1,6 @@
 {
-	"name": "llmbench",
-	"version": "0.1.0",
+	"name": "@llmbench/cli",
+	"version": "0.1.1",
 	"description": "Evaluate, compare, and benchmark LLMs from your terminal",
 	"type": "module",
 	"license": "Apache-2.0",

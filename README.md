@@ -7,8 +7,8 @@
 Zero-config setup. TypeScript-first. Local-first SQLite. Built-in web dashboard.
 
 [![CI](https://github.com/dfbustosus/llmbench/actions/workflows/ci.yml/badge.svg)](https://github.com/dfbustosus/llmbench/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/llmbench.svg)](https://www.npmjs.com/package/llmbench)
-[![npm downloads](https://img.shields.io/npm/dm/llmbench.svg)](https://www.npmjs.com/package/llmbench)
+[![npm version](https://img.shields.io/npm/v/@llmbench/cli.svg)](https://www.npmjs.com/package/@llmbench/cli)
+[![npm downloads](https://img.shields.io/npm/dm/@llmbench/cli.svg)](https://www.npmjs.com/package/@llmbench/cli)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/dfbustosus/llmbench/blob/main/LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](https://www.typescriptlang.org)
@@ -20,10 +20,10 @@ Zero-config setup. TypeScript-first. Local-first SQLite. Built-in web dashboard.
 ## Quick Start
 
 ```bash
-npx llmbench init
+npx @llmbench/cli init
 export OPENAI_API_KEY=sk-...
-npx llmbench run -d datasets/example.json
-npx llmbench serve
+npx @llmbench/cli run -d datasets/example.json
+npx @llmbench/cli serve
 ```
 
 That's it. Four commands to go from zero to a full evaluation with a web dashboard at `http://localhost:3000`.
@@ -42,13 +42,13 @@ That's it. Four commands to go from zero to a full evaluation with a web dashboa
 
 ```bash
 # Run directly (no install)
-npx llmbench init
+npx @llmbench/cli init
 
 # Or install as a project dependency
-npm install llmbench
+npm install @llmbench/cli
 
 # Or globally
-npm install -g llmbench
+npm install -g @llmbench/cli
 ```
 
 **Requirements:** Node.js >= 20

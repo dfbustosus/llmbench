@@ -94,7 +94,7 @@ export default config;
 		console.log(chalk.bold("Next steps:"));
 		console.log(`  1. Set your API key: ${chalk.cyan("export OPENAI_API_KEY=sk-...")}`);
 		console.log(
-			`  2. Run your first eval: ${chalk.cyan("npx llmbench run --dataset datasets/example.json")}`,
+			`  2. Run your first eval: ${chalk.cyan("npx @llmbench/cli run --dataset datasets/example.json")}`,
 		);
-		console.log(`  3. View results: ${chalk.cyan("npx llmbench serve")}`);
+		console.log(`  3. View results: ${chalk.cyan("npx @llmbench/cli serve")}`);
 	});
