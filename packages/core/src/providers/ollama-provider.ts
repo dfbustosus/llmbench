@@ -1,4 +1,4 @@
-import type { ProviderConfig, ProviderResponse } from "@llmbench/types";
+import type { ChatMessage, ProviderConfig, ProviderResponse } from "@llmbench/types";
 import { BaseProvider } from "./base-provider.js";
 
 export class OllamaProvider extends BaseProvider {
@@ -9,18 +9,23 @@ export class OllamaProvider extends BaseProvider {
 		this.baseUrl = config.baseUrl || "http://localhost:11434";
 	}
 
-	async generate(input: string, overrides?: Partial<ProviderConfig>): Promise<ProviderResponse> {
+	async generate(
+		input: string | ChatMessage[],
+		overrides?: Partial<ProviderConfig>,
+	): Promise<ProviderResponse> {
 		const cfg = this.mergeConfig(overrides);
 		const startTime = Date.now();
 
 		try {
+			const messages = this.buildMessages(input, overrides);
+
 			const response = await fetch(`${this.baseUrl}/api/chat`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				signal: this.createTimeoutSignal(cfg.timeoutMs),
 				body: JSON.stringify({
 					model: cfg.model,
-					messages: [{ role: "user", content: input }],
+					messages,
 					stream: false,
 					options: {
 						temperature: cfg.temperature ?? 0,
