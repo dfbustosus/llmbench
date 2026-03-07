@@ -1,4 +1,4 @@
-import type { TestCase } from "@llmbench/types";
+import type { ChatMessage, TestCase } from "@llmbench/types";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { LLMBenchDB } from "../client.js";
@@ -11,6 +11,7 @@ export class TestCaseRepository {
 		datasetId: string;
 		input: string;
 		expected: string;
+		messages?: ChatMessage[];
 		context?: Record<string, unknown>;
 		tags?: string[];
 		orderIndex?: number;
@@ -20,6 +21,7 @@ export class TestCaseRepository {
 			datasetId: data.datasetId,
 			input: data.input,
 			expected: data.expected,
+			messages: data.messages ? JSON.stringify(data.messages) : null,
 			context: data.context ? JSON.stringify(data.context) : null,
 			tags: data.tags ? JSON.stringify(data.tags) : null,
 			orderIndex: data.orderIndex ?? 0,
@@ -32,6 +34,7 @@ export class TestCaseRepository {
 			datasetId: testCase.datasetId,
 			input: testCase.input,
 			expected: testCase.expected,
+			messages: data.messages,
 			context: data.context,
 			tags: data.tags,
 			orderIndex: testCase.orderIndex,
@@ -43,6 +46,7 @@ export class TestCaseRepository {
 			datasetId: string;
 			input: string;
 			expected: string;
+			messages?: ChatMessage[];
 			context?: Record<string, unknown>;
 			tags?: string[];
 			orderIndex?: number;
@@ -84,6 +88,7 @@ export class TestCaseRepository {
 			datasetId: row.datasetId,
 			input: row.input,
 			expected: row.expected,
+			messages: row.messages ? JSON.parse(row.messages) : undefined,
 			context: row.context ? JSON.parse(row.context) : undefined,
 			tags: row.tags ? JSON.parse(row.tags) : undefined,
 			orderIndex: row.orderIndex,
