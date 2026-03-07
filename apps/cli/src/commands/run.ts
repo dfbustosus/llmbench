@@ -29,7 +29,13 @@ import { renderResultsTable } from "../renderers/results-table.js";
 function validateDatasetJson(data: unknown): asserts data is {
 	name?: string;
 	description?: string;
-	testCases: Array<{ input: string; expected: string; tags?: string[] }>;
+	testCases: Array<{
+		input: string;
+		expected: string;
+		messages?: Array<{ role: string; content: string }>;
+		context?: Record<string, unknown>;
+		tags?: string[];
+	}>;
 } {
 	if (!data || typeof data !== "object") {
 		throw new Error("Dataset file must contain a JSON object");
@@ -126,6 +132,10 @@ export const runCommand = new Command("run")
 						datasetId: dataset.id,
 						input: tc.input,
 						expected: tc.expected,
+						messages: tc.messages as
+							| Array<{ role: "system" | "user" | "assistant"; content: string }>
+							| undefined,
+						context: tc.context,
 						tags: tc.tags,
 						orderIndex: i,
 					})),
