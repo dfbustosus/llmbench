@@ -1,4 +1,4 @@
-import type { ProviderConfig, ProviderResponse } from "@llmbench/types";
+import type { ChatMessage, ProviderConfig, ProviderResponse } from "@llmbench/types";
 import { BaseProvider } from "./base-provider.js";
 
 export class AnthropicProvider extends BaseProvider {
@@ -11,11 +11,34 @@ export class AnthropicProvider extends BaseProvider {
 		this.baseUrl = config.baseUrl || "https://api.anthropic.com/v1";
 	}
 
-	async generate(input: string, overrides?: Partial<ProviderConfig>): Promise<ProviderResponse> {
+	async generate(
+		input: string | ChatMessage[],
+		overrides?: Partial<ProviderConfig>,
+	): Promise<ProviderResponse> {
 		const cfg = this.mergeConfig(overrides);
 		const startTime = Date.now();
 
 		try {
+			const allMessages = this.buildMessages(input, overrides);
+
+			// Anthropic requires system message as a separate top-level field
+			const systemMessages = allMessages.filter((m) => m.role === "system");
+			const nonSystemMessages = allMessages.filter((m) => m.role !== "system");
+			const systemText = systemMessages.map((m) => m.content).join("\n\n");
+
+			const body: Record<string, unknown> = {
+				model: cfg.model,
+				max_tokens: cfg.maxTokens ?? 1024,
+				messages: nonSystemMessages.map((m) => ({ role: m.role, content: m.content })),
+				temperature: cfg.temperature ?? 0,
+				top_p: cfg.topP,
+				stop_sequences: cfg.stopSequences,
+			};
+
+			if (systemText) {
+				body.system = systemText;
+			}
+
 			const response = await fetch(`${this.baseUrl}/messages`, {
 				method: "POST",
 				headers: {
@@ -23,14 +46,7 @@ export class AnthropicProvider extends BaseProvider {
 					"x-api-key": this.apiKey,
 					"anthropic-version": "2023-06-01",
 				},
-				body: JSON.stringify({
-					model: cfg.model,
-					max_tokens: cfg.maxTokens ?? 1024,
-					messages: [{ role: "user", content: input }],
-					temperature: cfg.temperature ?? 0,
-					top_p: cfg.topP,
-					stop_sequences: cfg.stopSequences,
-				}),
+				body: JSON.stringify(body),
 				signal: this.createTimeoutSignal(cfg.timeoutMs),
 			});
 
