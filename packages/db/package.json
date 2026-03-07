@@ -1,0 +1,36 @@
+{
+	"name": "@llmbench/db",
+	"version": "0.1.0",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"sideEffects": false,
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc",
+		"test": "vitest run",
+		"clean": "rm -rf dist",
+		"prepublishOnly": "pnpm run build"
+	},
+	"dependencies": {
+		"@llmbench/types": "workspace:*",
+		"better-sqlite3": "^11.9.1",
+		"drizzle-orm": "^0.44.2",
+		"nanoid": "^5.1.5"
+	},
+	"devDependencies": {
+		"@types/better-sqlite3": "7.6.13",
+		"drizzle-kit": "^0.31.4",
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.18"
+	}
+}

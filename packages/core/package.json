@@ -1,0 +1,57 @@
+{
+	"name": "@llmbench/core",
+	"version": "0.1.0",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"sideEffects": false,
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./providers": {
+			"types": "./dist/providers/index.d.ts",
+			"import": "./dist/providers/index.js"
+		},
+		"./scorers": {
+			"types": "./dist/scorers/index.d.ts",
+			"import": "./dist/scorers/index.js"
+		},
+		"./engine": {
+			"types": "./dist/engine/index.d.ts",
+			"import": "./dist/engine/index.js"
+		},
+		"./cost": {
+			"types": "./dist/cost/index.d.ts",
+			"import": "./dist/cost/index.js"
+		},
+		"./comparison": {
+			"types": "./dist/comparison/index.d.ts",
+			"import": "./dist/comparison/index.js"
+		},
+		"./config": {
+			"types": "./dist/config/index.d.ts",
+			"import": "./dist/config/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc",
+		"test": "vitest run",
+		"clean": "rm -rf dist",
+		"prepublishOnly": "pnpm run build"
+	},
+	"dependencies": {
+		"@llmbench/types": "workspace:*",
+		"@llmbench/db": "workspace:*",
+		"nanoid": "^5.1.5"
+	},
+	"devDependencies": {
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.18"
+	}
+}
