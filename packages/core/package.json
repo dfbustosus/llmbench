@@ -1,13 +1,19 @@
 {
 	"name": "@llmbench/core",
 	"version": "0.1.0",
+	"description": "Evaluation engine, providers, and scorers for LLMBench",
 	"type": "module",
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/dfbustosus/llmbench.git",
+		"directory": "packages/core"
+	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"sideEffects": false,
 	"files": [
-		"dist",
-		"README.md"
+		"dist"
 	],
 	"exports": {
 		".": {

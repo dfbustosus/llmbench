@@ -17,6 +17,7 @@ export class OllamaProvider extends BaseProvider {
 			const response = await fetch(`${this.baseUrl}/api/chat`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
+				signal: this.createTimeoutSignal(cfg.timeoutMs),
 				body: JSON.stringify({
 					model: cfg.model,
 					messages: [{ role: "user", content: input }],

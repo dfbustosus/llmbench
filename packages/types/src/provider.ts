@@ -10,6 +10,7 @@ export interface ProviderConfig {
 	frequencyPenalty?: number;
 	presencePenalty?: number;
 	stopSequences?: string[];
+	timeoutMs?: number;
 	extra?: Record<string, unknown>;
 }
 

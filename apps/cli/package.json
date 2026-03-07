@@ -1,13 +1,32 @@
 {
 	"name": "llmbench",
 	"version": "0.1.0",
+	"description": "Evaluate, compare, and benchmark LLMs from your terminal",
 	"type": "module",
+	"license": "Apache-2.0",
+	"keywords": [
+		"llm",
+		"benchmark",
+		"evaluation",
+		"openai",
+		"anthropic",
+		"testing",
+		"ai",
+		"cli"
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/dfbustosus/llmbench.git",
+		"directory": "apps/cli"
+	},
+	"engines": {
+		"node": ">=20"
+	},
 	"bin": {
 		"llmbench": "./dist/index.js"
 	},
 	"files": [
-		"dist",
-		"README.md"
+		"dist"
 	],
 	"scripts": {
 		"build": "tsc",
