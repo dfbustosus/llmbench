@@ -1,21 +1,22 @@
-import { describe, it, expect } from "vitest";
-import { createInMemoryDB, initializeDB } from "@llmbench/db";
 import {
-	ProjectRepository,
-	DatasetRepository,
-	TestCaseRepository,
-	ProviderRepository,
-	EvalRunRepository,
-	EvalResultRepository,
-	ScoreRepository,
 	CostRecordRepository,
+	createInMemoryDB,
+	DatasetRepository,
+	EvalResultRepository,
+	EvalRunRepository,
+	initializeDB,
+	ProjectRepository,
+	ProviderRepository,
+	ScoreRepository,
+	TestCaseRepository,
 } from "@llmbench/db";
-import { EvaluationEngine } from "../engine/evaluation-engine.js";
-import { CostCalculator } from "../cost/cost-calculator.js";
-import { ExactMatchScorer } from "../scorers/deterministic/exact-match.js";
-import { ContainsScorer } from "../scorers/deterministic/contains.js";
-import { CustomProvider } from "../providers/custom-provider.js";
 import type { EvalEvent } from "@llmbench/types";
+import { describe, expect, it } from "vitest";
+import { CostCalculator } from "../cost/cost-calculator.js";
+import { EvaluationEngine } from "../engine/evaluation-engine.js";
+import { CustomProvider } from "../providers/custom-provider.js";
+import { ContainsScorer } from "../scorers/deterministic/contains.js";
+import { ExactMatchScorer } from "../scorers/deterministic/exact-match.js";
 
 describe("Integration: full evaluation pipeline", () => {
 	it("should run an evaluation end-to-end with a custom provider", async () => {
@@ -108,9 +109,9 @@ describe("Integration: full evaluation pipeline", () => {
 		// Verify run completed
 		const finalRun = await evalRunRepo.findById(run.id);
 		expect(finalRun).toBeDefined();
-		expect(finalRun!.status).toBe("completed");
-		expect(finalRun!.completedCases).toBe(2);
-		expect(finalRun!.failedCases).toBe(0);
+		expect(finalRun?.status).toBe("completed");
+		expect(finalRun?.completedCases).toBe(2);
+		expect(finalRun?.failedCases).toBe(0);
 
 		// Verify results were saved
 		const results = await evalResultRepo.findByRunId(run.id);
@@ -118,8 +119,8 @@ describe("Integration: full evaluation pipeline", () => {
 
 		const parisResult = results.find((r) => r.input.includes("capital"));
 		expect(parisResult).toBeDefined();
-		expect(parisResult!.output).toBe("Paris");
-		expect(parisResult!.error).toBeUndefined();
+		expect(parisResult?.output).toBe("Paris");
+		expect(parisResult?.error).toBeUndefined();
 
 		// Verify scores (2 scorers x 2 results = 4)
 		const allScores = [];
@@ -130,9 +131,7 @@ describe("Integration: full evaluation pipeline", () => {
 		expect(allScores).toHaveLength(4);
 
 		// Verify exact match gave 1.0 for "Paris"
-		const parisExact = allScores.find(
-			(s) => s.scorerName === "Exact Match" && s.value === 1,
-		);
+		const parisExact = allScores.find((s) => s.scorerName === "Exact Match" && s.value === 1);
 		expect(parisExact).toBeDefined();
 
 		// Verify events
@@ -212,8 +211,8 @@ describe("Integration: full evaluation pipeline", () => {
 		await engine.execute(run, [tc]);
 
 		const finalRun = await evalRunRepo.findById(run.id);
-		expect(finalRun!.status).toBe("failed");
-		expect(finalRun!.failedCases).toBe(1);
+		expect(finalRun?.status).toBe("failed");
+		expect(finalRun?.failedCases).toBe(1);
 
 		const results = await evalResultRepo.findByRunId(run.id);
 		expect(results).toHaveLength(1);

@@ -49,7 +49,8 @@ export class OpenAIProvider extends BaseProvider {
 
 			if (!response.ok) {
 				const err = data.error as Record<string, unknown> | undefined;
-				const errorMsg = (err?.message as string) || JSON.stringify(data) || `HTTP ${response.status}`;
+				const errorMsg =
+					(err?.message as string) || JSON.stringify(data) || `HTTP ${response.status}`;
 
 				// Throw on retryable errors so the retry handler can catch them
 				if (RETRYABLE_STATUS_CODES.has(response.status)) {

@@ -6,26 +6,26 @@
  */
 
 import {
-	createDB,
-	initializeDB,
-	ProjectRepository,
-	DatasetRepository,
-	TestCaseRepository,
-	ProviderRepository,
-	EvalRunRepository,
-	EvalResultRepository,
-	ScoreRepository,
-	CostRecordRepository,
-} from "@llmbench/db";
-import {
-	EvaluationEngine,
-	CostCalculator,
-	ExactMatchScorer,
 	ContainsScorer,
 	CosineSimilarityScorer,
+	CostCalculator,
 	CustomProvider,
+	EvaluationEngine,
+	ExactMatchScorer,
+	RunComparator,
 } from "@llmbench/core";
-import { RunComparator } from "@llmbench/core";
+import {
+	CostRecordRepository,
+	createDB,
+	DatasetRepository,
+	EvalResultRepository,
+	EvalRunRepository,
+	initializeDB,
+	ProjectRepository,
+	ProviderRepository,
+	ScoreRepository,
+	TestCaseRepository,
+} from "@llmbench/db";
 
 // ── Fake LLM that returns canned answers ──────────────────────────────
 const ANSWERS: Record<string, string> = {
@@ -135,11 +135,7 @@ async function main() {
 	console.log("✓ Providers: GoodModel (90% accuracy) vs BadModel (50% accuracy)");
 
 	// 4. Create scorers
-	const scorers = [
-		new ExactMatchScorer(),
-		new ContainsScorer(),
-		new CosineSimilarityScorer(),
-	];
+	const scorers = [new ExactMatchScorer(), new ContainsScorer(), new CosineSimilarityScorer()];
 	console.log("✓ Scorers: Exact Match, Contains, Cosine Similarity");
 	console.log();
 
@@ -181,9 +177,9 @@ async function main() {
 	console.log();
 
 	const finalRun1 = await evalRunRepo.findById(run1.id);
-	console.log(`  Status: ${finalRun1!.status}`);
-	console.log(`  Completed: ${finalRun1!.completedCases}/${finalRun1!.totalCases}`);
-	console.log(`  Failed: ${finalRun1!.failedCases}`);
+	console.log(`  Status: ${finalRun1?.status}`);
+	console.log(`  Completed: ${finalRun1?.completedCases}/${finalRun1?.totalCases}`);
+	console.log(`  Failed: ${finalRun1?.failedCases}`);
 
 	// Print scores
 	const results1 = await evalResultRepo.findByRunId(run1.id);
@@ -191,12 +187,11 @@ async function main() {
 	console.log("  Results:");
 	console.log("  ┌──────────────────────────────────────────────┐");
 	for (const r of results1) {
-		const provName =
-			r.providerId === goodRecord.id ? "GoodModel" : "BadModel ";
+		const provName = r.providerId === goodRecord.id ? "GoodModel" : "BadModel ";
 		const resultScores = await scoreRepo.findByResultId(r.id);
 		const exactScore = resultScores.find((s) => s.scorerName === "Exact Match");
 		const mark = exactScore?.value === 1 ? "✓" : "✗";
-		const inputShort = r.input.length > 30 ? r.input.slice(0, 30) + "…" : r.input;
+		const inputShort = r.input.length > 30 ? `${r.input.slice(0, 30)}…` : r.input;
 		console.log(
 			`  │ ${mark} ${provName} │ ${inputShort.padEnd(32)} │ ${r.output.slice(0, 15).padEnd(15)} │`,
 		);
@@ -242,8 +237,8 @@ async function main() {
 	console.log();
 
 	const finalRun2 = await evalRunRepo.findById(run2.id);
-	console.log(`  Status: ${finalRun2!.status}`);
-	console.log(`  Completed: ${finalRun2!.completedCases}/${finalRun2!.totalCases}`);
+	console.log(`  Status: ${finalRun2?.status}`);
+	console.log(`  Completed: ${finalRun2?.completedCases}/${finalRun2?.totalCases}`);
 	console.log();
 
 	// ── Compare runs ──────────────────────────────────────────────────
@@ -276,9 +271,15 @@ async function main() {
 	console.log("✓ Demo complete! Database saved to demo-llmbench.db");
 	console.log();
 	console.log("Next steps:");
-	console.log("  • View the web dashboard:  node apps/cli/dist/index.js serve --db demo-llmbench.db");
-	console.log("  • List runs:               node apps/cli/dist/index.js list --db demo-llmbench.db");
-	console.log(`  • Compare runs:            node apps/cli/dist/index.js compare ${run1.id.slice(0, 8)} ${run2.id.slice(0, 8)} --db demo-llmbench.db`);
+	console.log(
+		"  • View the web dashboard:  node apps/cli/dist/index.js serve --db demo-llmbench.db",
+	);
+	console.log(
+		"  • List runs:               node apps/cli/dist/index.js list --db demo-llmbench.db",
+	);
+	console.log(
+		`  • Compare runs:            node apps/cli/dist/index.js compare ${run1.id.slice(0, 8)} ${run2.id.slice(0, 8)} --db demo-llmbench.db`,
+	);
 
 	// Cleanup
 	process.exit(0);
