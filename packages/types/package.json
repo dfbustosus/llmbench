@@ -1,0 +1,50 @@
+{
+	"name": "@llmbench/types",
+	"version": "0.1.0",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"sideEffects": false,
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./provider": {
+			"types": "./dist/provider.d.ts",
+			"import": "./dist/provider.js"
+		},
+		"./scoring": {
+			"types": "./dist/scoring.d.ts",
+			"import": "./dist/scoring.js"
+		},
+		"./evaluation": {
+			"types": "./dist/evaluation.d.ts",
+			"import": "./dist/evaluation.js"
+		},
+		"./dataset": {
+			"types": "./dist/dataset.d.ts",
+			"import": "./dist/dataset.js"
+		},
+		"./cost": {
+			"types": "./dist/cost.d.ts",
+			"import": "./dist/cost.js"
+		},
+		"./events": {
+			"types": "./dist/events.d.ts",
+			"import": "./dist/events.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc",
+		"clean": "rm -rf dist",
+		"prepublishOnly": "pnpm run build"
+	},
+	"devDependencies": {
+		"typescript": "^5.9.3"
+	}
+}
