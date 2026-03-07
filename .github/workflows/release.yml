@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"
 
+concurrency:
+  group: release
+
 permissions:
   contents: write
   id-token: write
@@ -13,6 +16,8 @@ jobs:
   release:
     name: Publish to npm
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: npm
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -22,9 +27,10 @@ jobs:
           cache: "pnpm"
           registry-url: "https://registry.npmjs.org"
       - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
       - run: pnpm build
       - run: pnpm test
-      - run: pnpm -r publish --access public --no-git-checks
+      - run: pnpm -r publish --access public --no-git-checks --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Create GitHub Release

@@ -1,61 +1,54 @@
-<p align="center">
-  <h1 align="center">LLMBench</h1>
-  <p align="center">
-    <strong>The open-source LLM benchmarking and evaluation platform.</strong>
-  </p>
-  <p align="center">
-    Zero-config setup. Beautiful dashboard. TypeScript-first. Local-first.
-  </p>
-</p>
+<div align="center">
 
-<p align="center">
-  <a href="https://github.com/llmbench/llmbench/actions/workflows/ci.yml"><img src="https://github.com/llmbench/llmbench/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://www.npmjs.com/package/llmbench"><img src="https://img.shields.io/npm/v/llmbench.svg" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/llmbench"><img src="https://img.shields.io/npm/dm/llmbench.svg" alt="npm downloads"></a>
-  <a href="https://github.com/llmbench/llmbench/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License"></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg" alt="Node.js"></a>
-  <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-strict-blue.svg" alt="TypeScript"></a>
-</p>
+# LLMBench
+
+**Evaluate, compare, and benchmark LLMs from your terminal.**
+
+Zero-config setup. TypeScript-first. Local-first SQLite. Built-in web dashboard.
+
+[![CI](https://github.com/dfbustosus/llmbench/actions/workflows/ci.yml/badge.svg)](https://github.com/dfbustosus/llmbench/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/llmbench.svg)](https://www.npmjs.com/package/llmbench)
+[![npm downloads](https://img.shields.io/npm/dm/llmbench.svg)](https://www.npmjs.com/package/llmbench)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/dfbustosus/llmbench/blob/main/LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](https://www.typescriptlang.org)
+
+</div>
 
 ---
-
-## Why LLMBench?
-
-Existing LLM evaluation tools are either too academic, too enterprise, or too CLI-only. LLMBench combines **radical simplicity**, a **beautiful web dashboard**, **local-first SQLite storage**, and **TypeScript-first configuration** in a single `npx llmbench` experience.
-
-| Feature | LLMBench | Promptfoo | LangSmith | Braintrust |
-|---------|---------|-----------|-----------|------------|
-| Zero-config setup | Yes | Partial | No | No |
-| Web dashboard | Yes | No | Yes | Yes |
-| Local-first | Yes | Yes | No | No |
-| TypeScript config | Yes | YAML | Python | Python |
-| Open source | Yes | Yes | No | Partial |
-| Self-hosted | Yes | Yes | No | No |
 
 ## Quick Start
 
 ```bash
-# Initialize a new project
 npx llmbench init
-
-# Set your API key
 export OPENAI_API_KEY=sk-...
-
-# Run your first evaluation
-npx llmbench run --dataset datasets/example.json
-
-# View results in the dashboard
+npx llmbench run -d datasets/example.json
 npx llmbench serve
 ```
+
+That's it. Four commands to go from zero to a full evaluation with a web dashboard at `http://localhost:3000`.
+
+## Features
+
+- **Multi-provider** — Run the same prompts against OpenAI, Anthropic, Google AI, Ollama, or any custom provider. Compare side-by-side.
+- **Scoring engine** — Exact match, contains, regex, JSON deep compare, cosine similarity, LLM-as-judge, or compose your own weighted scorer.
+- **Regression detection** — Compare any two runs to catch score regressions, cost increases, and latency changes.
+- **Cost tracking** — Per-request token counts and cost breakdowns with built-in pricing tables.
+- **Web dashboard** — Next.js 15 app with charts, drill-down results, and run comparisons. Launches with `llmbench serve`.
+- **Local-first** — Everything stored in a single SQLite file. No cloud accounts, no external services, no data leaving your machine.
+- **TypeScript config** — Full type safety and autocompletion. No YAML, no JSON schemas.
 
 ## Installation
 
 ```bash
-# As a project dependency
-pnpm add llmbench
+# Run directly (no install)
+npx llmbench init
+
+# Or install as a project dependency
+npm install llmbench
 
 # Or globally
-pnpm add -g llmbench
+npm install -g llmbench
 ```
 
 **Requirements:** Node.js >= 20
@@ -73,6 +66,7 @@ const config: LLMBenchConfig = {
   providers: [
     { type: "openai", name: "GPT-4o", model: "gpt-4o" },
     { type: "anthropic", name: "Claude Sonnet", model: "claude-sonnet-4-6" },
+    { type: "ollama", name: "Llama 3.2", model: "llama3.2" },
   ],
 
   scorers: [
@@ -93,7 +87,7 @@ export default config;
 
 ## Datasets
 
-Create JSON datasets in your project:
+Create a JSON file with your test cases:
 
 ```json
 {
@@ -105,119 +99,64 @@ Create JSON datasets in your project:
 }
 ```
 
-## CLI Commands
+## CLI Reference
 
 | Command | Description |
 |---------|-------------|
-| `llmbench init` | Scaffold a new project with config and example dataset |
-| `llmbench run -d <dataset>` | Run an evaluation against a dataset |
+| `llmbench init` | Scaffold config file and example dataset |
+| `llmbench run -d <dataset>` | Run evaluation against a dataset |
+| `llmbench run -d <dataset> --concurrency 10` | Run with custom concurrency |
 | `llmbench list` | List all evaluation runs |
-| `llmbench compare <runA> <runB>` | Compare two runs side-by-side with regression detection |
-| `llmbench serve` | Launch the web dashboard |
+| `llmbench list --project <name>` | Filter runs by project |
+| `llmbench compare <runA> <runB>` | Compare two runs with regression detection |
+| `llmbench serve` | Launch web dashboard on `localhost:3000` |
+| `llmbench serve -p 8080` | Launch dashboard on custom port |
 
 ## Providers
 
-LLMBench supports multiple LLM providers out of the box:
-
-| Provider | Type | Env Variable |
-|----------|------|-------------|
+| Provider | Config type | Environment Variable |
+|----------|-------------|---------------------|
 | OpenAI | `openai` | `OPENAI_API_KEY` |
 | Anthropic | `anthropic` | `ANTHROPIC_API_KEY` |
 | Google AI | `google` | `GOOGLE_AI_API_KEY` |
-| Ollama | `ollama` | (local, no key needed) |
-| Custom | `custom` | (user-defined) |
+| Ollama | `ollama` | None (local) |
+| Custom | `custom` | User-defined |
+
+API keys are read from environment variables only. They are never stored in the database or config files.
 
 ## Scorers
 
-### Deterministic Scorers
-- **Exact Match** - Binary match with case/trim options
-- **Contains** - Checks if output contains expected text
-- **Regex** - Pattern matching with configurable flags
-- **JSON Match** - Deep JSON comparison with partial matching
+| Scorer | Config type | Description |
+|--------|-------------|-------------|
+| Exact Match | `exact-match` | Binary match with optional case/trim normalization |
+| Contains | `contains` | Checks if output contains the expected text |
+| Regex | `regex` | Pattern matching with configurable flags |
+| JSON Match | `json-match` | Deep JSON comparison with partial matching support |
+| Cosine Similarity | `cosine-similarity` | Token-based vector similarity (0-1) |
+| LLM Judge | `llm-judge` | Use an LLM to evaluate outputs against a custom rubric |
+| Weighted Average | `composite` | Combine multiple scorers with custom weights |
 
-### Semantic Scorers
-- **Cosine Similarity** - Token-based vector similarity (0-1)
+## How It Compares
 
-### AI Scorers
-- **LLM Judge** - Use an LLM to evaluate outputs with custom rubrics
+| Feature | LLMBench | Promptfoo | LangSmith | Braintrust |
+|---------|---------|-----------|-----------|------------|
+| Zero-config setup | Yes | Partial | No | No |
+| Web dashboard | Yes | No | Yes | Yes |
+| Local-first | Yes | Yes | No | No |
+| TypeScript config | Yes | YAML | Python | Python |
+| Open source | Yes | Yes | No | Partial |
+| Self-hosted | Yes | Yes | No | No |
 
-### Composite Scorers
-- **Weighted Average** - Combine multiple scorers with custom weights
+## Contributing
 
-## Architecture
-
-```
-llmbench/
-  packages/
-    types/     Pure TypeScript interfaces (zero deps)
-    db/        Drizzle ORM + SQLite (WAL mode)
-    core/      Evaluation engine, providers, scorers
-    ui/        shadcn/ui component library
-  apps/
-    cli/       Commander-based CLI tool
-    web/       Next.js 15 dashboard with tRPC
-```
-
-### Package Dependency Graph
-
-```
-@llmbench/types  (leaf - zero dependencies)
-       |
-@llmbench/db     (depends on: types)
-       |
-@llmbench/core   (depends on: types, db)
-       |
-apps/cli        (depends on: types, db, core)
-apps/web        (depends on: types, db, core, ui)
-
-@llmbench/ui     (leaf - pure React components)
-```
-
-## Development
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, architecture details, and guidelines for adding new providers or scorers.
 
 ```bash
-# Clone and install
-git clone https://github.com/llmbench/llmbench.git
+git clone https://github.com/dfbustosus/llmbench.git
 cd llmbench
 pnpm install
-
-# Build all packages
 pnpm build
-
-# Run tests
 pnpm test
-
-# Lint and format
-pnpm lint
-pnpm lint:fix
-
-# Dev mode (watch)
-pnpm dev
-```
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Monorepo | Turborepo + pnpm |
-| Language | TypeScript (strict mode) |
-| Frontend | Next.js 15 (App Router) |
-| UI Components | shadcn/ui + Radix + Tailwind v4 |
-| API | tRPC v11 |
-| Database | SQLite + Drizzle ORM |
-| Charts | Recharts |
-| CLI | Commander + ora + chalk |
-| Testing | Vitest |
-| Linting | Biome |
-
-## API Keys
-
-API keys are read exclusively from environment variables. They are **never** stored in the database or config files.
-
-```bash
-export OPENAI_API_KEY=sk-...
-export ANTHROPIC_API_KEY=sk-ant-...
-export GOOGLE_AI_API_KEY=AI...
 ```
 
 ## License

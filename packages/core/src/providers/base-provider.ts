@@ -23,6 +23,11 @@ export abstract class BaseProvider implements IProvider {
 		return { ...this.config, ...overrides };
 	}
 
+	protected createTimeoutSignal(overrideMs?: number): AbortSignal | undefined {
+		const ms = overrideMs ?? this.config.timeoutMs;
+		return ms ? AbortSignal.timeout(ms) : undefined;
+	}
+
 	protected resolveApiKey(configKey: string | undefined, envVar: string): string {
 		const key = configKey || process.env[envVar];
 		if (!key) {

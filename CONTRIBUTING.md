@@ -17,7 +17,7 @@ By participating in this project, you agree to maintain a respectful and inclusi
 ### Setup
 
 ```bash
-git clone https://github.com/llmbench/llmbench.git
+git clone https://github.com/dfbustosus/llmbench.git
 cd llmbench
 pnpm install
 pnpm build

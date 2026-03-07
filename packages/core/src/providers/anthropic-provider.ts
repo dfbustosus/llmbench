@@ -31,6 +31,7 @@ export class AnthropicProvider extends BaseProvider {
 					top_p: cfg.topP,
 					stop_sequences: cfg.stopSequences,
 				}),
+				signal: this.createTimeoutSignal(cfg.timeoutMs),
 			});
 
 			const data = (await response.json()) as Record<string, unknown>;

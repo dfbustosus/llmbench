@@ -1,13 +1,19 @@
 {
 	"name": "@llmbench/db",
 	"version": "0.1.0",
+	"description": "SQLite database layer for LLMBench",
 	"type": "module",
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/dfbustosus/llmbench.git",
+		"directory": "packages/db"
+	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"sideEffects": false,
 	"files": [
-		"dist",
-		"README.md"
+		"dist"
 	],
 	"exports": {
 		".": {

@@ -42,6 +42,7 @@ export class OpenAIProvider extends BaseProvider {
 					Authorization: `Bearer ${this.apiKey}`,
 				},
 				body: JSON.stringify(body),
+				signal: this.createTimeoutSignal(cfg.timeoutMs),
 			});
 
 			const data = (await response.json()) as Record<string, unknown>;

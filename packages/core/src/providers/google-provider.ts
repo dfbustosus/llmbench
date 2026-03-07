@@ -16,10 +16,14 @@ export class GoogleProvider extends BaseProvider {
 		const startTime = Date.now();
 
 		try {
-			const url = `${this.baseUrl}/models/${cfg.model}:generateContent?key=${this.apiKey}`;
+			const url = `${this.baseUrl}/models/${cfg.model}:generateContent`;
 			const response = await fetch(url, {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: {
+					"Content-Type": "application/json",
+					"x-goog-api-key": this.apiKey,
+				},
+				signal: this.createTimeoutSignal(cfg.timeoutMs),
 				body: JSON.stringify({
 					contents: [{ parts: [{ text: input }] }],
 					generationConfig: {
