@@ -33,6 +33,7 @@ export const testCases = sqliteTable(
 			.references(() => datasets.id, { onDelete: "cascade" }),
 		input: text("input").notNull(),
 		expected: text("expected").notNull(),
+		messages: text("messages"), // JSON - ChatMessage[]
 		context: text("context"), // JSON
 		tags: text("tags"), // JSON array
 		orderIndex: integer("order_index").notNull().default(0),

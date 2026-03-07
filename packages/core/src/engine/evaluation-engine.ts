@@ -5,10 +5,12 @@ import type {
 	ScoreRepository,
 } from "@llmbench/db";
 import type {
+	ChatMessage,
 	EvalEvent,
 	EvalRun,
 	IProvider,
 	IScorer,
+	ProviderConfig,
 	ScoreResult,
 	TestCase,
 } from "@llmbench/types";
@@ -16,6 +18,7 @@ import type { CostCalculator } from "../cost/cost-calculator.js";
 import { ConcurrencyManager } from "./concurrency-manager.js";
 import { EventBus } from "./event-bus.js";
 import { RetryHandler } from "./retry-handler.js";
+import { interpolate, interpolateMessages } from "./template-engine.js";
 
 export interface EngineOptions {
 	providers: Map<string, IProvider>;
@@ -101,7 +104,30 @@ export class EvaluationEngine {
 					});
 
 					try {
-						const response = await retry.execute(() => provider.generate(testCase.input));
+						// Interpolate templates with test case context
+						const context = testCase.context ?? {};
+						const hasContext = Object.keys(context).length > 0;
+
+						let providerInput: string | ChatMessage[];
+						if (testCase.messages) {
+							providerInput = hasContext
+								? interpolateMessages(testCase.messages, context)
+								: testCase.messages;
+						} else {
+							providerInput = hasContext ? interpolate(testCase.input, context) : testCase.input;
+						}
+
+						// Interpolate system message if provider has one and context exists
+						let configOverrides: Partial<ProviderConfig> | undefined;
+						if (hasContext && provider.systemMessage) {
+							configOverrides = {
+								systemMessage: interpolate(provider.systemMessage, context),
+							};
+						}
+
+						const response = await retry.execute(() =>
+							provider.generate(providerInput, configOverrides),
+						);
 
 						if (response.error) {
 							throw new Error(response.error);

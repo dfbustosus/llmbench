@@ -1,9 +1,16 @@
-import type { IProvider, ProviderConfig, ProviderResponse, ProviderType } from "@llmbench/types";
+import type {
+	ChatMessage,
+	IProvider,
+	ProviderConfig,
+	ProviderResponse,
+	ProviderType,
+} from "@llmbench/types";
 
 export abstract class BaseProvider implements IProvider {
 	readonly type: ProviderType;
 	readonly name: string;
 	readonly model: string;
+	readonly systemMessage?: string;
 	protected config: ProviderConfig;
 
 	constructor(config: ProviderConfig) {
@@ -14,10 +21,41 @@ export abstract class BaseProvider implements IProvider {
 		this.type = config.type;
 		this.name = config.name;
 		this.model = config.model;
+		this.systemMessage = config.systemMessage;
 		this.config = config;
 	}
 
-	abstract generate(input: string, config?: Partial<ProviderConfig>): Promise<ProviderResponse>;
+	abstract generate(
+		input: string | ChatMessage[],
+		config?: Partial<ProviderConfig>,
+	): Promise<ProviderResponse>;
+
+	/**
+	 * Build a ChatMessage[] from the input, prepending the system message
+	 * from config if one is configured and not already present in the input.
+	 */
+	protected buildMessages(
+		input: string | ChatMessage[],
+		overrides?: Partial<ProviderConfig>,
+	): ChatMessage[] {
+		const systemMsg = overrides?.systemMessage ?? this.config.systemMessage;
+
+		if (typeof input === "string") {
+			const messages: ChatMessage[] = [];
+			if (systemMsg) {
+				messages.push({ role: "system", content: systemMsg });
+			}
+			messages.push({ role: "user", content: input });
+			return messages;
+		}
+
+		// If messages already include a system message, use them as-is
+		const hasSystem = input.some((m) => m.role === "system");
+		if (!hasSystem && systemMsg) {
+			return [{ role: "system", content: systemMsg }, ...input];
+		}
+		return input;
+	}
 
 	protected mergeConfig(overrides?: Partial<ProviderConfig>): ProviderConfig {
 		return { ...this.config, ...overrides };

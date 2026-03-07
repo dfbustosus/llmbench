@@ -1,4 +1,4 @@
-import type { ProviderConfig, ProviderResponse } from "@llmbench/types";
+import type { ChatMessage, ProviderConfig, ProviderResponse } from "@llmbench/types";
 import { BaseProvider } from "./base-provider.js";
 
 /** HTTP status codes that are worth retrying */
@@ -14,15 +14,20 @@ export class OpenAIProvider extends BaseProvider {
 		this.baseUrl = config.baseUrl || "https://api.openai.com/v1";
 	}
 
-	async generate(input: string, overrides?: Partial<ProviderConfig>): Promise<ProviderResponse> {
+	async generate(
+		input: string | ChatMessage[],
+		overrides?: Partial<ProviderConfig>,
+	): Promise<ProviderResponse> {
 		const cfg = this.mergeConfig(overrides);
 		const startTime = Date.now();
 
 		try {
+			const messages = this.buildMessages(input, overrides);
+
 			// Build request body, omitting undefined values
 			const body: Record<string, unknown> = {
 				model: cfg.model,
-				messages: [{ role: "user", content: input }],
+				messages,
 				temperature: cfg.temperature ?? 0,
 			};
 

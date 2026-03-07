@@ -1,7 +1,10 @@
-import type { ProviderConfig, ProviderResponse } from "@llmbench/types";
+import type { ChatMessage, ProviderConfig, ProviderResponse } from "@llmbench/types";
 import { BaseProvider } from "./base-provider.js";
 
-export type CustomGenerateFn = (input: string, config: ProviderConfig) => Promise<ProviderResponse>;
+export type CustomGenerateFn = (
+	input: string | ChatMessage[],
+	config: ProviderConfig,
+) => Promise<ProviderResponse>;
 
 export class CustomProvider extends BaseProvider {
 	private generateFn: CustomGenerateFn;
@@ -11,7 +14,10 @@ export class CustomProvider extends BaseProvider {
 		this.generateFn = generateFn;
 	}
 
-	async generate(input: string, overrides?: Partial<ProviderConfig>): Promise<ProviderResponse> {
+	async generate(
+		input: string | ChatMessage[],
+		overrides?: Partial<ProviderConfig>,
+	): Promise<ProviderResponse> {
 		const cfg = this.mergeConfig(overrides);
 		return this.generateFn(input, cfg);
 	}

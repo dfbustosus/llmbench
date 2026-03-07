@@ -63,11 +63,14 @@ describe("Integration: full evaluation pipeline", () => {
 		// Create mock provider that echoes canned responses
 		const mockProvider = new CustomProvider(
 			{ type: "custom", name: "MockLLM", model: "mock-v1" },
-			async (input) => ({
-				output: input.includes("capital") ? "Paris" : "42",
-				latencyMs: 50,
-				tokenUsage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
-			}),
+			async (input) => {
+				const text = typeof input === "string" ? input : input.map((m) => m.content).join(" ");
+				return {
+					output: text.includes("capital") ? "Paris" : "42",
+					latencyMs: 50,
+					tokenUsage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+				};
+			},
 		);
 
 		const providers = new Map([[provRecord.id, mockProvider]]);

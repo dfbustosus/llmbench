@@ -53,6 +53,7 @@ export function initializeDB(db: LLMBenchDB) {
 			dataset_id TEXT NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
 			input TEXT NOT NULL,
 			expected TEXT NOT NULL,
+			messages TEXT,
 			context TEXT,
 			tags TEXT,
 			order_index INTEGER NOT NULL DEFAULT 0
@@ -141,6 +142,13 @@ export function initializeDB(db: LLMBenchDB) {
 			created_at TEXT NOT NULL
 		)
 	`);
+
+	// Migrations for existing databases
+	try {
+		db.run(`ALTER TABLE test_cases ADD COLUMN messages TEXT`);
+	} catch {
+		// Column already exists
+	}
 
 	// Create indexes
 	db.run(`CREATE INDEX IF NOT EXISTS idx_datasets_project_id ON datasets(project_id)`);

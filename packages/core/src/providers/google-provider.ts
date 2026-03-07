@@ -1,4 +1,4 @@
-import type { ProviderConfig, ProviderResponse } from "@llmbench/types";
+import type { ChatMessage, ProviderConfig, ProviderResponse } from "@llmbench/types";
 import { BaseProvider } from "./base-provider.js";
 
 export class GoogleProvider extends BaseProvider {
@@ -11,11 +11,41 @@ export class GoogleProvider extends BaseProvider {
 		this.baseUrl = config.baseUrl || "https://generativelanguage.googleapis.com/v1beta";
 	}
 
-	async generate(input: string, overrides?: Partial<ProviderConfig>): Promise<ProviderResponse> {
+	async generate(
+		input: string | ChatMessage[],
+		overrides?: Partial<ProviderConfig>,
+	): Promise<ProviderResponse> {
 		const cfg = this.mergeConfig(overrides);
 		const startTime = Date.now();
 
 		try {
+			const allMessages = this.buildMessages(input, overrides);
+
+			// Google uses systemInstruction for system messages, contents for the rest
+			const systemMessages = allMessages.filter((m) => m.role === "system");
+			const nonSystemMessages = allMessages.filter((m) => m.role !== "system");
+			const systemText = systemMessages.map((m) => m.content).join("\n\n");
+
+			// Map to Google's content format (role: "user" | "model")
+			const contents = nonSystemMessages.map((m) => ({
+				role: m.role === "assistant" ? "model" : "user",
+				parts: [{ text: m.content }],
+			}));
+
+			const body: Record<string, unknown> = {
+				contents,
+				generationConfig: {
+					temperature: cfg.temperature ?? 0,
+					maxOutputTokens: cfg.maxTokens,
+					topP: cfg.topP,
+					stopSequences: cfg.stopSequences,
+				},
+			};
+
+			if (systemText) {
+				body.systemInstruction = { parts: [{ text: systemText }] };
+			}
+
 			const url = `${this.baseUrl}/models/${cfg.model}:generateContent`;
 			const response = await fetch(url, {
 				method: "POST",
@@ -24,15 +54,7 @@ export class GoogleProvider extends BaseProvider {
 					"x-goog-api-key": this.apiKey,
 				},
 				signal: this.createTimeoutSignal(cfg.timeoutMs),
-				body: JSON.stringify({
-					contents: [{ parts: [{ text: input }] }],
-					generationConfig: {
-						temperature: cfg.temperature ?? 0,
-						maxOutputTokens: cfg.maxTokens,
-						topP: cfg.topP,
-						stopSequences: cfg.stopSequences,
-					},
-				}),
+				body: JSON.stringify(body),
 			});
 
 			const data = (await response.json()) as Record<string, unknown>;
