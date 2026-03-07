@@ -40,11 +40,13 @@ function createFakeProvider(name: string, accuracy: number) {
 	return new CustomProvider(
 		{ type: "custom", name, model: `fake-${name.toLowerCase()}` },
 		async (input) => {
+			const text = typeof input === "string" ? input : input.map((m) => m.content).join(" ");
+
 			// Simulate latency
 			const latency = 50 + Math.random() * 200;
 			await new Promise((r) => setTimeout(r, latency));
 
-			const answer = ANSWERS[input];
+			const answer = ANSWERS[text];
 			// Simulate accuracy — sometimes return wrong answer
 			const correct = Math.random() < accuracy;
 			const output = correct && answer ? answer : "I don't know";
@@ -53,9 +55,9 @@ function createFakeProvider(name: string, accuracy: number) {
 				output,
 				latencyMs: latency,
 				tokenUsage: {
-					inputTokens: input.split(" ").length * 2,
+					inputTokens: text.split(" ").length * 2,
 					outputTokens: output.split(" ").length * 2,
-					totalTokens: (input.split(" ").length + output.split(" ").length) * 2,
+					totalTokens: (text.split(" ").length + output.split(" ").length) * 2,
 				},
 			};
 		},
