@@ -7,6 +7,7 @@ import {
 	initializeDB,
 	type LLMBenchDB,
 	ProjectRepository,
+	ProviderRepository,
 	ScoreRepository,
 	TestCaseRepository,
 } from "@llmbench/db";
@@ -20,19 +21,20 @@ const t = initTRPC.context<{ db: LLMBenchDB }>().create({
 export const router = t.router;
 export const publicProcedure = t.procedure;
 
-let db: LLMBenchDB | null = null;
+// Use globalThis to persist DB connection across Next.js HMR in dev mode
+const globalForDb = globalThis as unknown as {
+	__llmbenchDb?: LLMBenchDB;
+	__llmbenchRepos?: ReturnType<typeof createRepositories>;
+};
 
 export function getDB(): LLMBenchDB {
-	if (!db) {
+	if (!globalForDb.__llmbenchDb) {
 		const dbPath = process.env.LLMBENCH_DB_PATH || "./llmbench.db";
-		db = createDB(dbPath);
-		initializeDB(db);
+		globalForDb.__llmbenchDb = createDB(dbPath);
+		initializeDB(globalForDb.__llmbenchDb);
 	}
-	return db;
+	return globalForDb.__llmbenchDb;
 }
-
-// Shared repository instances (lazy singletons)
-let _repos: ReturnType<typeof createRepositories> | null = null;
 
 function createRepositories(database: LLMBenchDB) {
 	return {
@@ -43,12 +45,13 @@ function createRepositories(database: LLMBenchDB) {
 		evalResult: new EvalResultRepository(database),
 		score: new ScoreRepository(database),
 		costRecord: new CostRecordRepository(database),
+		provider: new ProviderRepository(database),
 	};
 }
 
 export function getRepos() {
-	if (!_repos) {
-		_repos = createRepositories(getDB());
+	if (!globalForDb.__llmbenchRepos) {
+		globalForDb.__llmbenchRepos = createRepositories(getDB());
 	}
-	return _repos;
+	return globalForDb.__llmbenchRepos;
 }
