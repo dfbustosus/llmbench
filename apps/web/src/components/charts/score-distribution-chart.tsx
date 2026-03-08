@@ -1,6 +1,6 @@
 "use client";
 
-import type { EvalResult } from "@llmbench/types";
+import type { EvalResult, ScoreResult } from "@llmbench/types";
 import {
 	Bar,
 	BarChart,
@@ -15,9 +15,10 @@ import {
 interface ScoreDistributionChartProps {
 	runId: string;
 	results: EvalResult[];
+	scoresByResultId?: Record<string, ScoreResult[]>;
 }
 
-export function ScoreDistributionChart({ results }: ScoreDistributionChartProps) {
+export function ScoreDistributionChart({ results, scoresByResultId }: ScoreDistributionChartProps) {
 	// Build score distribution buckets from 0.0 to 1.0
 	const buckets = [
 		{ range: "0.0-0.2", min: 0, max: 0.2, count: 0 },
@@ -27,18 +28,13 @@ export function ScoreDistributionChart({ results }: ScoreDistributionChartProps)
 		{ range: "0.8-1.0", min: 0.8, max: 1.01, count: 0 },
 	];
 
-	// If results have score data, use it; otherwise fall back to error-based scoring
 	let hasScores = false;
 
 	for (const r of results) {
-		// EvalResult may carry scores from the tRPC join
-		const resultScores = (r as unknown as Record<string, unknown>).scores as
-			| Array<{ value: number }>
-			| undefined;
+		const resultScores = scoresByResultId?.[r.id];
 
 		if (resultScores && resultScores.length > 0) {
 			hasScores = true;
-			// Average the scores for this result
 			const avg = resultScores.reduce((sum, s) => sum + s.value, 0) / resultScores.length;
 			for (const bucket of buckets) {
 				if (avg >= bucket.min && avg < bucket.max) {
@@ -79,8 +75,8 @@ export function ScoreDistributionChart({ results }: ScoreDistributionChartProps)
 					<YAxis className="text-xs" allowDecimals={false} />
 					<Tooltip />
 					<Bar dataKey="count" radius={[4, 4, 0, 0]}>
-						{chartData.map((_entry, index) => (
-							<Cell key={`cell-${index}`} fill={colors[index]} />
+						{chartData.map((entry) => (
+							<Cell key={entry.range} fill={colors[chartData.indexOf(entry)]} />
 						))}
 					</Bar>
 				</BarChart>
