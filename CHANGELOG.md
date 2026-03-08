@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.3] - 2026-03-08
+## [0.1.4] - 2026-03-08
 
 ### Added
 
@@ -13,18 +13,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--threshold`, `--max-failure-rate`, and `--json` flags for `llmbench run`
 - `--fail-on-regression`, `--min-severity`, and `--json` flags for `llmbench compare`
 - Per-provider score breakdown in the web dashboard
+- Provider column in run detail results table (shown for multi-provider runs)
+- Score columns with color-coded values (green/yellow/red) in results table
 - Batch score fetching via `ScoreRepository.findByRunId()`
-- Provider column in run detail results table
-- Score columns with color-coded values in results table
-- Score distribution chart uses actual scorer data
+- `getScoresByRunId` and `getProvidersByProject` tRPC endpoints
 - Latency chart shows provider names in multi-provider runs
 - Prompt template engine with variable interpolation
 - `messages` and `context` fields in test case datasets
+- Multi-turn conversation support (`ChatMessage[]`) for all providers
+- System message support in `BaseProvider`
 - SECURITY.md with vulnerability reporting policy
+- CHANGELOG.md
+- `bugs` and `homepage` fields in all publishable package.json files
+- tRPC error logging in API route handler
 
 ### Fixed
 
-- Score distribution chart fallback when no scores are attached to results
+- Score distribution chart now uses actual scorer data instead of error-based fallback
+- Web dashboard 500 errors caused by better-sqlite3 native bindings in webpack (externalized)
+- DB singleton persistence across Next.js HMR reloads via `globalThis`
+- Gate config validation in config loader
+
+## [0.1.3] - 2026-03-06
+
+### Added
+
+- Comprehensive READMEs with examples for all packages
+- npm publish metadata for all packages
 
 ## [0.1.2] - 2026-02-15
 
