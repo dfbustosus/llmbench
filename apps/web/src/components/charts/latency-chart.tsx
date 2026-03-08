@@ -5,13 +5,14 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 
 interface LatencyChartProps {
 	results: EvalResult[];
+	providerMap?: Record<string, { name: string; model: string }>;
 }
 
-export function LatencyChart({ results }: LatencyChartProps) {
+export function LatencyChart({ results, providerMap }: LatencyChartProps) {
 	const data = results.map((r, i) => ({
 		index: i + 1,
 		latency: Math.round(r.latencyMs),
-		label: `#${i + 1}`,
+		label: providerMap ? `#${i + 1} (${providerMap[r.providerId]?.name ?? "?"})` : `#${i + 1}`,
 	}));
 
 	return (

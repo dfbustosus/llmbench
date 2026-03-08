@@ -20,6 +20,14 @@ export const evalRunRouter = router({
 		return getRepos().score.findByResultId(input);
 	}),
 
+	getScoresByRunId: publicProcedure.input(z.string()).query(async ({ input }) => {
+		return getRepos().score.findByRunId(input);
+	}),
+
+	getProvidersByProject: publicProcedure.input(z.string()).query(async ({ input }) => {
+		return getRepos().provider.findByProjectId(input);
+	}),
+
 	getCostRecords: publicProcedure.input(z.string()).query(async ({ input }) => {
 		return getRepos().costRecord.findByRunId(input);
 	}),

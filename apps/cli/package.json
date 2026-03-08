@@ -19,6 +19,10 @@
 		"url": "https://github.com/dfbustosus/llmbench.git",
 		"directory": "apps/cli"
 	},
+	"bugs": {
+		"url": "https://github.com/dfbustosus/llmbench/issues"
+	},
+	"homepage": "https://github.com/dfbustosus/llmbench#readme",
 	"engines": {
 		"node": ">=20"
 	},

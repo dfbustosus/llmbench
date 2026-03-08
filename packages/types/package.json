@@ -9,6 +9,10 @@
 		"url": "https://github.com/dfbustosus/llmbench.git",
 		"directory": "packages/types"
 	},
+	"bugs": {
+		"url": "https://github.com/dfbustosus/llmbench/issues"
+	},
+	"homepage": "https://github.com/dfbustosus/llmbench#readme",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"sideEffects": false,
