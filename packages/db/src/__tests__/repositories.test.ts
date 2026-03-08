@@ -297,6 +297,114 @@ describe("ScoreRepository", () => {
 		expect(found[0].value).toBe(1.0);
 		expect(found[0].scorerName).toBe("Exact Match");
 	});
+
+	it("should find scores by run ID grouped by result ID", async () => {
+		const projectRepo = new ProjectRepository(db);
+		const project = await projectRepo.create({ name: "Test" });
+		const datasetRepo = new DatasetRepository(db);
+		const dataset = await datasetRepo.create({ projectId: project.id, name: "DS" });
+		const tcRepo = new TestCaseRepository(db);
+		const tc1 = await tcRepo.create({ datasetId: dataset.id, input: "Q1", expected: "A1" });
+		const tc2 = await tcRepo.create({ datasetId: dataset.id, input: "Q2", expected: "A2" });
+		const providerRepo = new ProviderRepository(db);
+		const provider = await providerRepo.create({
+			projectId: project.id,
+			type: "openai",
+			name: "GPT-4",
+			model: "gpt-4",
+		});
+		const runRepo = new EvalRunRepository(db);
+		const run = await runRepo.create({
+			projectId: project.id,
+			datasetId: dataset.id,
+			config: {
+				providerIds: [provider.id],
+				scorerConfigs: [],
+				concurrency: 1,
+				maxRetries: 0,
+				timeoutMs: 30000,
+			},
+			totalCases: 2,
+		});
+		const resultRepo = new EvalResultRepository(db);
+		const result1 = await resultRepo.create({
+			runId: run.id,
+			testCaseId: tc1.id,
+			providerId: provider.id,
+			input: "Q1",
+			output: "A1",
+			expected: "A1",
+			latencyMs: 100,
+			inputTokens: 10,
+			outputTokens: 5,
+			totalTokens: 15,
+		});
+		const result2 = await resultRepo.create({
+			runId: run.id,
+			testCaseId: tc2.id,
+			providerId: provider.id,
+			input: "Q2",
+			output: "wrong",
+			expected: "A2",
+			latencyMs: 120,
+			inputTokens: 12,
+			outputTokens: 6,
+			totalTokens: 18,
+		});
+
+		const repo = new ScoreRepository(db);
+		await repo.create(result1.id, {
+			scorerId: "exact-match",
+			scorerName: "Exact Match",
+			scorerType: "exact-match",
+			value: 1.0,
+		});
+		await repo.create(result1.id, {
+			scorerId: "contains",
+			scorerName: "Contains",
+			scorerType: "contains",
+			value: 1.0,
+		});
+		await repo.create(result2.id, {
+			scorerId: "exact-match",
+			scorerName: "Exact Match",
+			scorerType: "exact-match",
+			value: 0.0,
+		});
+
+		const scoresByResult = await repo.findByRunId(run.id);
+
+		expect(Object.keys(scoresByResult)).toHaveLength(2);
+		expect(scoresByResult[result1.id]).toHaveLength(2);
+		expect(scoresByResult[result2.id]).toHaveLength(1);
+		expect(scoresByResult[result1.id][0].scorerName).toBe("Exact Match");
+		expect(scoresByResult[result2.id][0].value).toBe(0.0);
+	});
+
+	it("should return empty object when no scores exist for run", async () => {
+		const projectRepo = new ProjectRepository(db);
+		const project = await projectRepo.create({ name: "Test" });
+		const datasetRepo = new DatasetRepository(db);
+		const dataset = await datasetRepo.create({ projectId: project.id, name: "DS" });
+		const runRepo = new EvalRunRepository(db);
+		const run = await runRepo.create({
+			projectId: project.id,
+			datasetId: dataset.id,
+			config: {
+				providerIds: ["p1"],
+				scorerConfigs: [],
+				concurrency: 1,
+				maxRetries: 0,
+				timeoutMs: 30000,
+			},
+			totalCases: 0,
+		});
+
+		const repo = new ScoreRepository(db);
+		const scoresByResult = await repo.findByRunId(run.id);
+
+		expect(Object.keys(scoresByResult)).toHaveLength(0);
+	});
 });
 
 describe("CostRecordRepository", () => {
