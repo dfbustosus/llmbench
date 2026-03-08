@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { LLMBenchConfig, ProviderConfig, ScorerConfig } from "@llmbench/types";
+import type { CIGateConfig, LLMBenchConfig, ProviderConfig, ScorerConfig } from "@llmbench/types";
 
 const CONFIG_FILES = ["llmbench.config.ts", "llmbench.config.js", "llmbench.config.mjs"];
 
@@ -70,6 +70,10 @@ export function validateConfig(config: unknown): asserts config is LLMBenchConfi
 	for (let i = 0; i < c.scorers.length; i++) {
 		validateScorerConfig(c.scorers[i], i);
 	}
+
+	if (c.gate !== undefined) {
+		validateGateConfig(c.gate);
+	}
 }
 
 function validateProviderConfig(
@@ -109,6 +113,45 @@ function validateScorerConfig(scorer: unknown, index: number): asserts scorer is
 	}
 	if (typeof s.type !== "string" || !s.type) {
 		throw new Error(`scorers[${index}].type must be a non-empty string`);
+	}
+}
+
+function validateGateConfig(gate: unknown): asserts gate is CIGateConfig {
+	if (!gate || typeof gate !== "object") {
+		throw new Error("gate must be an object");
+	}
+
+	const g = gate as Record<string, unknown>;
+
+	if (g.minScore !== undefined) {
+		if (typeof g.minScore !== "number" || g.minScore < 0 || g.minScore > 1) {
+			throw new Error("gate.minScore must be a number between 0 and 1");
+		}
+	}
+	if (g.maxFailureRate !== undefined) {
+		if (typeof g.maxFailureRate !== "number" || g.maxFailureRate < 0 || g.maxFailureRate > 1) {
+			throw new Error("gate.maxFailureRate must be a number between 0 and 1");
+		}
+	}
+	if (g.maxCost !== undefined) {
+		if (typeof g.maxCost !== "number" || g.maxCost <= 0) {
+			throw new Error("gate.maxCost must be a positive number");
+		}
+	}
+	if (g.maxLatencyMs !== undefined) {
+		if (typeof g.maxLatencyMs !== "number" || g.maxLatencyMs <= 0) {
+			throw new Error("gate.maxLatencyMs must be a positive number");
+		}
+	}
+	if (g.scorerThresholds !== undefined) {
+		if (typeof g.scorerThresholds !== "object" || g.scorerThresholds === null) {
+			throw new Error("gate.scorerThresholds must be an object");
+		}
+		for (const [key, val] of Object.entries(g.scorerThresholds as Record<string, unknown>)) {
+			if (typeof val !== "number" || val < 0 || val > 1) {
+				throw new Error(`gate.scorerThresholds["${key}"] must be a number between 0 and 1`);
+			}
+		}
 	}
 }
 

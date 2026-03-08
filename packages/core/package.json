@@ -40,6 +40,10 @@
 			"types": "./dist/comparison/index.d.ts",
 			"import": "./dist/comparison/index.js"
 		},
+		"./gate": {
+			"types": "./dist/gate/index.d.ts",
+			"import": "./dist/gate/index.js"
+		},
 		"./config": {
 			"types": "./dist/config/index.d.ts",
 			"import": "./dist/config/index.js"

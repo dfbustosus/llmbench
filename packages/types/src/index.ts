@@ -4,6 +4,7 @@ export * from "./cost.js";
 export * from "./dataset.js";
 export * from "./evaluation.js";
 export * from "./events.js";
+export * from "./gate.js";
 export * from "./project.js";
 export * from "./provider.js";
 export * from "./scoring.js";

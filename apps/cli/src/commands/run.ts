@@ -7,6 +7,7 @@ import {
 	EvaluationEngine,
 	loadConfig,
 	mergeWithDefaults,
+	ThresholdGate,
 } from "@llmbench/core";
 import {
 	CostRecordRepository,
@@ -20,7 +21,7 @@ import {
 	ScoreRepository,
 	TestCaseRepository,
 } from "@llmbench/db";
-import type { IScorer } from "@llmbench/types";
+import type { CIGateConfig, GateResult, IScorer, ScoreResult } from "@llmbench/types";
 import chalk from "chalk";
 import { Command } from "commander";
 import ora from "ora";
@@ -55,18 +56,72 @@ function validateDatasetJson(data: unknown): asserts data is {
 	}
 }
 
+function buildGateConfig(
+	configGate: CIGateConfig | undefined,
+	cliThreshold: string | undefined,
+	cliMaxFailureRate: string | undefined,
+): CIGateConfig | null {
+	const hasConfigGate = configGate && Object.keys(configGate).length > 0;
+	const hasCliFlags = cliThreshold !== undefined || cliMaxFailureRate !== undefined;
+
+	if (!hasConfigGate && !hasCliFlags) return null;
+
+	const gate: CIGateConfig = { ...configGate };
+
+	if (cliThreshold !== undefined) {
+		const value = Number(cliThreshold);
+		if (Number.isNaN(value) || value < 0 || value > 1) {
+			throw new Error("--threshold must be a number between 0 and 1");
+		}
+		gate.minScore = value;
+	}
+
+	if (cliMaxFailureRate !== undefined) {
+		const value = Number(cliMaxFailureRate);
+		if (Number.isNaN(value) || value < 0 || value > 1) {
+			throw new Error("--max-failure-rate must be a number between 0 and 1");
+		}
+		gate.maxFailureRate = value;
+	}
+
+	return gate;
+}
+
+function computeScorerAverages(allScores: Map<string, ScoreResult[]>): Record<string, number> {
+	const totals = new Map<string, { sum: number; count: number }>();
+	for (const scoreList of allScores.values()) {
+		for (const score of scoreList) {
+			const existing = totals.get(score.scorerName) ?? { sum: 0, count: 0 };
+			existing.sum += score.value;
+			existing.count++;
+			totals.set(score.scorerName, existing);
+		}
+	}
+	const result: Record<string, number> = {};
+	for (const [name, { sum, count }] of totals) {
+		result[name] = count > 0 ? sum / count : 0;
+	}
+	return result;
+}
+
 export const runCommand = new Command("run")
 	.description("Run an evaluation")
 	.requiredOption("-d, --dataset <path>", "Path to dataset JSON file")
 	.option("-c, --config <path>", "Path to config file")
 	.option("--concurrency <number>", "Concurrency level", "5")
 	.option("--tags <tags>", "Comma-separated tags")
+	.option("--threshold <score>", "Minimum average score threshold (0-1); exits 1 on failure")
+	.option("--max-failure-rate <rate>", "Maximum failure rate (0-1); exits 1 if exceeded")
+	.option("--json", "Output results as JSON (for CI pipelines)")
 	.action(async (options) => {
-		const spinner = ora("Loading configuration...").start();
+		const isJson = !!options.json;
+		const spinner = isJson ? null : ora("Loading configuration...").start();
 
 		try {
 			const config = mergeWithDefaults(await loadConfig(options.config));
-			spinner.text = "Initializing database...";
+			if (spinner) spinner.text = "Initializing database...";
+
+			const gateConfig = buildGateConfig(config.gate, options.threshold, options.maxFailureRate);
 
 			const db = createDB(config.dbPath);
 			initializeDB(db);
@@ -91,7 +146,7 @@ export const runCommand = new Command("run")
 			}
 
 			// Load and validate dataset
-			spinner.text = "Loading dataset...";
+			if (spinner) spinner.text = "Loading dataset...";
 			const datasetPath = resolve(process.cwd(), options.dataset);
 
 			if (!existsSync(datasetPath)) {
@@ -145,7 +200,7 @@ export const runCommand = new Command("run")
 			const testCases = await testCaseRepo.findByDatasetId(dataset.id);
 
 			// Create/find providers
-			spinner.text = "Setting up providers...";
+			if (spinner) spinner.text = "Setting up providers...";
 
 			if (config.providers.length === 0) {
 				throw new Error("No providers configured. Add providers to your llmbench.config.ts");
@@ -175,7 +230,7 @@ export const runCommand = new Command("run")
 			const scorers: IScorer[] = config.scorers.map((sc) => createScorer(sc));
 
 			// Create run
-			spinner.text = "Starting evaluation...";
+			if (spinner) spinner.text = "Starting evaluation...";
 			const run = await evalRunRepo.create({
 				projectId: project.id,
 				datasetId: dataset.id,
@@ -204,7 +259,7 @@ export const runCommand = new Command("run")
 			// Listen to events for progress
 			let lastProgress = 0;
 			engine.onEvent((event) => {
-				if (event.type === "run:progress") {
+				if (event.type === "run:progress" && spinner) {
 					const pct = Math.round((event.completedCases / event.totalCases) * 100);
 					if (pct > lastProgress) {
 						lastProgress = pct;
@@ -215,33 +270,82 @@ export const runCommand = new Command("run")
 
 			// Execute
 			await engine.execute(run, testCases);
-			spinner.succeed("Evaluation complete!");
+			if (spinner) spinner.succeed("Evaluation complete!");
 
-			// Display results
+			// Collect results and scores
 			const results = await evalResultRepo.findByRunId(run.id);
-			const allScores = new Map<string, Awaited<ReturnType<typeof scoreRepo.findByResultId>>>();
+			const allScores = new Map<string, ScoreResult[]>();
 			for (const result of results) {
 				allScores.set(result.id, await scoreRepo.findByResultId(result.id));
 			}
 
-			renderResultsTable(results, allScores);
-
 			const finalRun = await evalRunRepo.findById(run.id);
-			console.log();
-			console.log(chalk.bold("Summary:"));
-			console.log(`  Status: ${chalk.green(finalRun?.status)}`);
-			console.log(`  Total cases: ${finalRun?.totalCases}`);
-			console.log(`  Completed: ${finalRun?.completedCases}`);
-			console.log(`  Failed: ${finalRun?.failedCases}`);
-			if (finalRun?.totalCost) {
-				console.log(`  Total cost: $${finalRun.totalCost.toFixed(4)}`);
+
+			// Evaluate CI gate
+			let gateResult: GateResult | null = null;
+			if (gateConfig && finalRun) {
+				const gate = new ThresholdGate(gateConfig);
+				gateResult = gate.evaluateRun(finalRun, allScores);
 			}
-			if (finalRun?.avgLatencyMs) {
-				console.log(`  Avg latency: ${finalRun.avgLatencyMs.toFixed(0)}ms`);
+
+			if (isJson) {
+				const scorerAvgs = computeScorerAverages(allScores);
+				const output = {
+					runId: run.id,
+					status: finalRun?.status,
+					totalCases: finalRun?.totalCases,
+					completedCases: finalRun?.completedCases,
+					failedCases: finalRun?.failedCases,
+					totalCost: finalRun?.totalCost ?? null,
+					avgLatencyMs: finalRun?.avgLatencyMs ?? null,
+					scores: scorerAvgs,
+					...(gateResult ? { gate: gateResult } : {}),
+				};
+				console.log(JSON.stringify(output, null, 2));
+			} else {
+				renderResultsTable(results, allScores);
+
+				console.log();
+				console.log(chalk.bold("Summary:"));
+				console.log(`  Status: ${chalk.green(finalRun?.status)}`);
+				console.log(`  Total cases: ${finalRun?.totalCases}`);
+				console.log(`  Completed: ${finalRun?.completedCases}`);
+				console.log(`  Failed: ${finalRun?.failedCases}`);
+				if (finalRun?.totalCost) {
+					console.log(`  Total cost: $${finalRun.totalCost.toFixed(4)}`);
+				}
+				if (finalRun?.avgLatencyMs) {
+					console.log(`  Avg latency: ${finalRun.avgLatencyMs.toFixed(0)}ms`);
+				}
+
+				if (gateResult && !gateResult.passed) {
+					console.log();
+					console.log(chalk.bold.red("CI Gate: FAILED"));
+					for (const v of gateResult.violations) {
+						console.log(chalk.red(`  ✗ ${v.message}`));
+					}
+				} else if (gateResult) {
+					console.log();
+					console.log(chalk.bold.green("CI Gate: PASSED"));
+				}
+			}
+
+			if (gateResult && !gateResult.passed) {
+				process.exit(1);
 			}
 		} catch (error) {
-			spinner.fail("Evaluation failed");
-			console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+			if (spinner) spinner.fail("Evaluation failed");
+			if (isJson) {
+				console.log(
+					JSON.stringify(
+						{ error: error instanceof Error ? error.message : String(error) },
+						null,
+						2,
+					),
+				);
+			} else {
+				console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+			}
 			process.exit(1);
 		}
 	});
