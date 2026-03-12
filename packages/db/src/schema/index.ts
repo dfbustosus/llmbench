@@ -18,6 +18,7 @@ export const datasets = sqliteTable(
 		name: text("name").notNull(),
 		description: text("description"),
 		version: integer("version").notNull().default(1),
+		contentHash: text("content_hash"),
 		createdAt: text("created_at").notNull(),
 		updatedAt: text("updated_at").notNull(),
 	},
@@ -77,6 +78,7 @@ export const evalRuns = sqliteTable(
 		totalTokens: integer("total_tokens"),
 		avgLatencyMs: real("avg_latency_ms"),
 		tags: text("tags"), // JSON
+		datasetVersion: integer("dataset_version"),
 		createdAt: text("created_at").notNull(),
 		updatedAt: text("updated_at").notNull(),
 		completedAt: text("completed_at"),
