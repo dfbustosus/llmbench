@@ -90,6 +90,55 @@ describe("DatasetRepository", () => {
 		const datasets = await repo.findByProjectId(project.id);
 		expect(datasets).toHaveLength(2);
 	});
+
+	it("should create dataset with contentHash and custom version", async () => {
+		const projectRepo = new ProjectRepository(db);
+		const project = await projectRepo.create({ name: "Test" });
+		const repo = new DatasetRepository(db);
+
+		const dataset = await repo.create({
+			projectId: project.id,
+			name: "Versioned DS",
+			contentHash: "abc123hash",
+			version: 3,
+		});
+
+		expect(dataset.contentHash).toBe("abc123hash");
+		expect(dataset.version).toBe(3);
+
+		const found = await repo.findById(dataset.id);
+		expect(found?.contentHash).toBe("abc123hash");
+		expect(found?.version).toBe(3);
+	});
+
+	it("should update dataset with contentHash", async () => {
+		const projectRepo = new ProjectRepository(db);
+		const project = await projectRepo.create({ name: "Test" });
+		const repo = new DatasetRepository(db);
+
+		const dataset = await repo.create({ projectId: project.id, name: "DS" });
+		expect(dataset.contentHash).toBeUndefined();
+
+		const updated = await repo.update(dataset.id, { contentHash: "newhash456" });
+		expect(updated?.contentHash).toBe("newhash456");
+	});
+
+	it("should find datasets by name in project sorted by version DESC", async () => {
+		const projectRepo = new ProjectRepository(db);
+		const project = await projectRepo.create({ name: "Test" });
+		const repo = new DatasetRepository(db);
+
+		await repo.create({ projectId: project.id, name: "Same Name", version: 1, contentHash: "h1" });
+		await repo.create({ projectId: project.id, name: "Same Name", version: 3, contentHash: "h3" });
+		await repo.create({ projectId: project.id, name: "Same Name", version: 2, contentHash: "h2" });
+		await repo.create({ projectId: project.id, name: "Other", version: 1, contentHash: "h4" });
+
+		const results = await repo.findByNameInProject(project.id, "Same Name");
+		expect(results).toHaveLength(3);
+		expect(results[0].version).toBe(3);
+		expect(results[1].version).toBe(2);
+		expect(results[2].version).toBe(1);
+	});
 });
 
 describe("TestCaseRepository", () => {
@@ -187,6 +236,33 @@ describe("EvalRunRepository", () => {
 		const progressed = await repo.findById(run.id);
 		expect(progressed?.completedCases).toBe(5);
 		expect(progressed?.totalCost).toBe(0.05);
+	});
+
+	it("should create run with datasetVersion", async () => {
+		const projectRepo = new ProjectRepository(db);
+		const project = await projectRepo.create({ name: "Test" });
+		const datasetRepo = new DatasetRepository(db);
+		const dataset = await datasetRepo.create({ projectId: project.id, name: "DS" });
+		const repo = new EvalRunRepository(db);
+
+		const run = await repo.create({
+			projectId: project.id,
+			datasetId: dataset.id,
+			config: {
+				providerIds: ["p1"],
+				scorerConfigs: [],
+				concurrency: 5,
+				maxRetries: 3,
+				timeoutMs: 30000,
+			},
+			totalCases: 10,
+			datasetVersion: 3,
+		});
+
+		expect(run.datasetVersion).toBe(3);
+
+		const found = await repo.findById(run.id);
+		expect(found?.datasetVersion).toBe(3);
 	});
 });
 

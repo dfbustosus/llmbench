@@ -15,6 +15,7 @@ export interface EvalRun {
 	totalTokens?: number;
 	avgLatencyMs?: number;
 	tags?: string[];
+	datasetVersion?: number;
 	createdAt: string;
 	updatedAt: string;
 	completedAt?: string;

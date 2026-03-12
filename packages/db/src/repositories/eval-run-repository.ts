@@ -13,6 +13,7 @@ export class EvalRunRepository {
 		config: EvalRunConfig;
 		totalCases: number;
 		tags?: string[];
+		datasetVersion?: number;
 	}): Promise<EvalRun> {
 		const now = new Date().toISOString();
 		const record = {
@@ -25,6 +26,7 @@ export class EvalRunRepository {
 			completedCases: 0,
 			failedCases: 0,
 			tags: data.tags ? JSON.stringify(data.tags) : null,
+			datasetVersion: data.datasetVersion ?? null,
 			createdAt: now,
 			updatedAt: now,
 		};
@@ -103,6 +105,7 @@ export class EvalRunRepository {
 			totalTokens: row.totalTokens ?? undefined,
 			avgLatencyMs: row.avgLatencyMs ?? undefined,
 			tags: row.tags ? JSON.parse(row.tags) : undefined,
+			datasetVersion: row.datasetVersion ?? undefined,
 			createdAt: row.createdAt,
 			updatedAt: row.updatedAt,
 			completedAt: row.completedAt ?? undefined,

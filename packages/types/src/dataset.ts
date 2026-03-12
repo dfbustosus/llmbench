@@ -4,6 +4,7 @@ export interface Dataset {
 	name: string;
 	description?: string;
 	version: number;
+	contentHash?: string;
 	createdAt: string;
 	updatedAt: string;
 }

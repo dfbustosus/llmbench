@@ -42,6 +42,7 @@ export function initializeDB(db: LLMBenchDB) {
 			name TEXT NOT NULL,
 			description TEXT,
 			version INTEGER NOT NULL DEFAULT 1,
+			content_hash TEXT,
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		)
@@ -87,6 +88,7 @@ export function initializeDB(db: LLMBenchDB) {
 			total_tokens INTEGER,
 			avg_latency_ms REAL,
 			tags TEXT,
+			dataset_version INTEGER,
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL,
 			completed_at TEXT
@@ -161,6 +163,18 @@ export function initializeDB(db: LLMBenchDB) {
 	// Migrations for existing databases
 	try {
 		db.run(`ALTER TABLE test_cases ADD COLUMN messages TEXT`);
+	} catch {
+		// Column already exists
+	}
+
+	try {
+		db.run(`ALTER TABLE datasets ADD COLUMN content_hash TEXT`);
+	} catch {
+		// Column already exists
+	}
+
+	try {
+		db.run(`ALTER TABLE eval_runs ADD COLUMN dataset_version INTEGER`);
 	} catch {
 		// Column already exists
 	}
