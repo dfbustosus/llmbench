@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
 	CacheRepository,
 	CostRecordRepository,
@@ -339,5 +340,191 @@ describe("Integration: full evaluation pipeline", () => {
 		// Verify cache entry count
 		const cacheCount = await cacheRepo.count();
 		expect(cacheCount).toBe(1);
+	});
+});
+
+// Helper functions mirroring the CLI's computeContentHash logic
+function canonicalize(value: unknown): unknown {
+	if (value === null || value === undefined) return value;
+	if (Array.isArray(value)) return value.map(canonicalize);
+	if (typeof value === "object") {
+		const sorted: Record<string, unknown> = {};
+		for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+			sorted[key] = canonicalize((value as Record<string, unknown>)[key]);
+		}
+		return sorted;
+	}
+	return value;
+}
+
+function computeContentHash(
+	testCases: Array<{
+		input: string;
+		expected: string;
+		messages?: unknown;
+		context?: Record<string, unknown>;
+		tags?: string[];
+	}>,
+): string {
+	const semantic = testCases.map((tc) => ({
+		input: tc.input,
+		expected: tc.expected,
+		messages: tc.messages,
+		context: tc.context,
+		tags: tc.tags,
+	}));
+	const canonical = JSON.stringify(canonicalize(semantic));
+	return createHash("sha256").update(canonical).digest("hex");
+}
+
+describe("computeContentHash", () => {
+	it("should produce deterministic hashes for the same input", () => {
+		const cases = [
+			{ input: "What is 2+2?", expected: "4", tags: ["math"] },
+			{ input: "Capital of France?", expected: "Paris" },
+		];
+		const hash1 = computeContentHash(cases);
+		const hash2 = computeContentHash(cases);
+		expect(hash1).toBe(hash2);
+		expect(hash1).toHaveLength(64); // SHA-256 hex
+	});
+
+	it("should produce same hash regardless of context key order", () => {
+		const cases1 = [{ input: "Q", expected: "A", context: { alpha: 1, beta: "two", gamma: true } }];
+		const cases2 = [{ input: "Q", expected: "A", context: { gamma: true, alpha: 1, beta: "two" } }];
+		expect(computeContentHash(cases1)).toBe(computeContentHash(cases2));
+	});
+
+	it("should detect changes in input, expected, messages, context, and tags", () => {
+		const base = [{ input: "Q", expected: "A", context: { key: "val" }, tags: ["t1"] }];
+		const changedInput = [{ input: "Q2", expected: "A", context: { key: "val" }, tags: ["t1"] }];
+		const changedExpected = [{ input: "Q", expected: "B", context: { key: "val" }, tags: ["t1"] }];
+		const changedContext = [{ input: "Q", expected: "A", context: { key: "val2" }, tags: ["t1"] }];
+		const changedTags = [{ input: "Q", expected: "A", context: { key: "val" }, tags: ["t2"] }];
+
+		const baseHash = computeContentHash(base);
+		expect(computeContentHash(changedInput)).not.toBe(baseHash);
+		expect(computeContentHash(changedExpected)).not.toBe(baseHash);
+		expect(computeContentHash(changedContext)).not.toBe(baseHash);
+		expect(computeContentHash(changedTags)).not.toBe(baseHash);
+	});
+});
+
+describe("Dataset versioning flow", () => {
+	it("should create v1, reuse on unchanged, create v2 on change, and reuse v1 on revert", async () => {
+		const db = createInMemoryDB();
+		initializeDB(db);
+
+		const projectRepo = new ProjectRepository(db);
+		const datasetRepo = new DatasetRepository(db);
+		const testCaseRepo = new TestCaseRepository(db);
+
+		const project = await projectRepo.create({ name: "Version Test" });
+
+		const originalCases = [
+			{ input: "Q1", expected: "A1" },
+			{ input: "Q2", expected: "A2" },
+		];
+
+		// Step 1: Create v1
+		const hash1 = computeContentHash(originalCases);
+		const v1 = await datasetRepo.create({
+			projectId: project.id,
+			name: "DS",
+			contentHash: hash1,
+			version: 1,
+		});
+		await testCaseRepo.createMany(
+			originalCases.map((tc, i) => ({
+				datasetId: v1.id,
+				input: tc.input,
+				expected: tc.expected,
+				orderIndex: i,
+			})),
+		);
+
+		expect(v1.version).toBe(1);
+		expect(v1.contentHash).toBe(hash1);
+
+		// Step 2: Same content — should match v1
+		const versions = await datasetRepo.findByNameInProject(project.id, "DS");
+		const matchUnchanged = versions.find((d) => d.contentHash === hash1);
+		expect(matchUnchanged).toBeDefined();
+		expect(matchUnchanged?.id).toBe(v1.id);
+
+		// Step 3: Changed content — create v2
+		const changedCases = [
+			{ input: "Q1", expected: "A1" },
+			{ input: "Q2", expected: "A2-updated" },
+			{ input: "Q3", expected: "A3" },
+		];
+		const hash2 = computeContentHash(changedCases);
+		expect(hash2).not.toBe(hash1);
+
+		const matchChanged = versions.find((d) => d.contentHash === hash2);
+		expect(matchChanged).toBeUndefined(); // No match
+
+		const v2 = await datasetRepo.create({
+			projectId: project.id,
+			name: "DS",
+			contentHash: hash2,
+			version: 2,
+		});
+		await testCaseRepo.createMany(
+			changedCases.map((tc, i) => ({
+				datasetId: v2.id,
+				input: tc.input,
+				expected: tc.expected,
+				orderIndex: i,
+			})),
+		);
+		expect(v2.version).toBe(2);
+
+		// Step 4: Revert to original content — should match v1
+		const allVersions = await datasetRepo.findByNameInProject(project.id, "DS");
+		expect(allVersions).toHaveLength(2);
+		const matchReverted = allVersions.find((d) => d.contentHash === hash1);
+		expect(matchReverted).toBeDefined();
+		expect(matchReverted?.id).toBe(v1.id);
+		expect(matchReverted?.version).toBe(1);
+
+		// Verify test cases are independent per version
+		const v1Cases = await testCaseRepo.findByDatasetId(v1.id);
+		const v2Cases = await testCaseRepo.findByDatasetId(v2.id);
+		expect(v1Cases).toHaveLength(2);
+		expect(v2Cases).toHaveLength(3);
+	});
+
+	it("should backfill contentHash for legacy datasets", async () => {
+		const db = createInMemoryDB();
+		initializeDB(db);
+
+		const projectRepo = new ProjectRepository(db);
+		const datasetRepo = new DatasetRepository(db);
+		const testCaseRepo = new TestCaseRepository(db);
+
+		const project = await projectRepo.create({ name: "Legacy Test" });
+
+		// Create a dataset without contentHash (simulating legacy)
+		const legacy = await datasetRepo.create({
+			projectId: project.id,
+			name: "Legacy DS",
+		});
+		expect(legacy.contentHash).toBeUndefined();
+
+		await testCaseRepo.createMany([
+			{ datasetId: legacy.id, input: "Q1", expected: "A1", orderIndex: 0 },
+		]);
+
+		// Backfill: compute hash from DB test cases and store it
+		const dbCases = await testCaseRepo.findByDatasetId(legacy.id);
+		const backfillHash = computeContentHash(dbCases);
+		const updated = await datasetRepo.update(legacy.id, { contentHash: backfillHash });
+
+		expect(updated?.contentHash).toBe(backfillHash);
+
+		// Now the same content should match
+		const incomingHash = computeContentHash([{ input: "Q1", expected: "A1" }]);
+		expect(incomingHash).toBe(backfillHash);
 	});
 });
