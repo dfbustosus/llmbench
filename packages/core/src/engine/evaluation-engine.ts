@@ -11,10 +11,12 @@ import type {
 	IProvider,
 	IScorer,
 	ProviderConfig,
+	ProviderResponse,
 	ScoreResult,
 	TestCase,
 } from "@llmbench/types";
 import type { CostCalculator } from "../cost/cost-calculator.js";
+import type { CacheManager } from "./cache-manager.js";
 import { ConcurrencyManager } from "./concurrency-manager.js";
 import { EventBus } from "./event-bus.js";
 import { RetryHandler } from "./retry-handler.js";
@@ -28,6 +30,7 @@ export interface EngineOptions {
 	scoreRepo: ScoreRepository;
 	costRecordRepo: CostRecordRepository;
 	costCalculator: CostCalculator;
+	cacheManager?: CacheManager;
 }
 
 export class EvaluationEngine {
@@ -39,6 +42,8 @@ export class EvaluationEngine {
 	private scoreRepo: ScoreRepository;
 	private costRecordRepo: CostRecordRepository;
 	private costCalculator: CostCalculator;
+	private cacheManager?: CacheManager;
+	private cacheHits = 0;
 
 	constructor(options: EngineOptions) {
 		this.providers = options.providers;
@@ -48,6 +53,11 @@ export class EvaluationEngine {
 		this.scoreRepo = options.scoreRepo;
 		this.costRecordRepo = options.costRecordRepo;
 		this.costCalculator = options.costCalculator;
+		this.cacheManager = options.cacheManager;
+	}
+
+	getCacheHits(): number {
+		return this.cacheHits;
 	}
 
 	onEvent(handler: (event: EvalEvent) => void): () => void {
@@ -125,12 +135,43 @@ export class EvaluationEngine {
 							};
 						}
 
-						const response = await retry.execute(() =>
-							provider.generate(providerInput, configOverrides),
-						);
+						// Check cache before calling provider
+						let response: ProviderResponse;
+						let cached = false;
 
-						if (response.error) {
-							throw new Error(response.error);
+						if (this.cacheManager) {
+							const cachedResponse = await this.cacheManager.get(
+								providerId,
+								provider.model,
+								providerInput,
+								configOverrides,
+							);
+							if (cachedResponse) {
+								response = cachedResponse;
+								cached = true;
+								this.cacheHits++;
+							} else {
+								response = await retry.execute(() =>
+									provider.generate(providerInput, configOverrides),
+								);
+								if (response.error) {
+									throw new Error(response.error);
+								}
+								await this.cacheManager.set(
+									providerId,
+									provider.model,
+									providerInput,
+									configOverrides,
+									response,
+								);
+							}
+						} else {
+							response = await retry.execute(() =>
+								provider.generate(providerInput, configOverrides),
+							);
+							if (response.error) {
+								throw new Error(response.error);
+							}
 						}
 
 						// Calculate cost once
@@ -194,6 +235,7 @@ export class EvaluationEngine {
 							testCaseId: testCase.id,
 							providerId,
 							latencyMs: response.latencyMs,
+							cached,
 							scores: scores.map((s) => ({
 								scorerName: s.scorerName,
 								value: s.value,

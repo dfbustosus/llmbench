@@ -1,4 +1,5 @@
 import {
+	CacheRepository,
 	CostRecordRepository,
 	createInMemoryDB,
 	DatasetRepository,
@@ -11,8 +12,9 @@ import {
 	TestCaseRepository,
 } from "@llmbench/db";
 import type { EvalEvent } from "@llmbench/types";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CostCalculator } from "../cost/cost-calculator.js";
+import { CacheManager } from "../engine/cache-manager.js";
 import { EvaluationEngine } from "../engine/evaluation-engine.js";
 import { CustomProvider } from "../providers/custom-provider.js";
 import { ContainsScorer } from "../scorers/deterministic/contains.js";
@@ -220,5 +222,122 @@ describe("Integration: full evaluation pipeline", () => {
 		const results = await evalResultRepo.findByRunId(run.id);
 		expect(results).toHaveLength(1);
 		expect(results[0].error).toBe("Rate limit exceeded");
+	});
+
+	it("should use cache to skip provider calls on second run", async () => {
+		const db = createInMemoryDB();
+		initializeDB(db);
+
+		const projectRepo = new ProjectRepository(db);
+		const datasetRepo = new DatasetRepository(db);
+		const testCaseRepo = new TestCaseRepository(db);
+		const providerRepo = new ProviderRepository(db);
+		const evalRunRepo = new EvalRunRepository(db);
+		const evalResultRepo = new EvalResultRepository(db);
+		const scoreRepo = new ScoreRepository(db);
+		const costRecordRepo = new CostRecordRepository(db);
+		const cacheRepo = new CacheRepository(db);
+
+		const project = await projectRepo.create({ name: "Cache Test" });
+		const dataset = await datasetRepo.create({
+			projectId: project.id,
+			name: "Cache Dataset",
+		});
+
+		const tc = await testCaseRepo.create({
+			datasetId: dataset.id,
+			input: "What is 1+1?",
+			expected: "2",
+			orderIndex: 0,
+		});
+
+		const provRecord = await providerRepo.create({
+			projectId: project.id,
+			type: "custom",
+			name: "CacheLLM",
+			model: "cache-v1",
+			config: {},
+		});
+
+		const generateFn = vi.fn(async () => ({
+			output: "2",
+			latencyMs: 100,
+			tokenUsage: { inputTokens: 5, outputTokens: 1, totalTokens: 6 },
+		}));
+
+		const mockProvider = new CustomProvider(
+			{ type: "custom", name: "CacheLLM", model: "cache-v1" },
+			generateFn,
+		);
+
+		const cacheManager = new CacheManager(cacheRepo);
+
+		// First run — should call provider
+		const engine1 = new EvaluationEngine({
+			providers: new Map([[provRecord.id, mockProvider]]),
+			scorers: [new ExactMatchScorer()],
+			evalRunRepo,
+			evalResultRepo,
+			scoreRepo,
+			costRecordRepo,
+			costCalculator: new CostCalculator(),
+			cacheManager,
+		});
+
+		const run1 = await evalRunRepo.create({
+			projectId: project.id,
+			datasetId: dataset.id,
+			config: {
+				providerIds: [provRecord.id],
+				scorerConfigs: [],
+				concurrency: 1,
+				maxRetries: 0,
+				timeoutMs: 5000,
+			},
+			totalCases: 1,
+		});
+
+		await engine1.execute(run1, [tc]);
+		expect(generateFn).toHaveBeenCalledTimes(1);
+		expect(engine1.getCacheHits()).toBe(0);
+
+		// Second run — should use cache, not call provider again
+		const engine2 = new EvaluationEngine({
+			providers: new Map([[provRecord.id, mockProvider]]),
+			scorers: [new ExactMatchScorer()],
+			evalRunRepo,
+			evalResultRepo,
+			scoreRepo,
+			costRecordRepo,
+			costCalculator: new CostCalculator(),
+			cacheManager,
+		});
+
+		const run2 = await evalRunRepo.create({
+			projectId: project.id,
+			datasetId: dataset.id,
+			config: {
+				providerIds: [provRecord.id],
+				scorerConfigs: [],
+				concurrency: 1,
+				maxRetries: 0,
+				timeoutMs: 5000,
+			},
+			totalCases: 1,
+		});
+
+		await engine2.execute(run2, [tc]);
+		expect(generateFn).toHaveBeenCalledTimes(1); // Still 1 — not called again
+		expect(engine2.getCacheHits()).toBe(1);
+
+		// Verify cached result has 0 latency
+		const results = await evalResultRepo.findByRunId(run2.id);
+		expect(results).toHaveLength(1);
+		expect(results[0].latencyMs).toBe(0);
+		expect(results[0].output).toBe("2");
+
+		// Verify cache entry count
+		const cacheCount = await cacheRepo.count();
+		expect(cacheCount).toBe(1);
 	});
 });

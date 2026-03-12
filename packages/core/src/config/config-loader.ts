@@ -1,7 +1,13 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { CIGateConfig, LLMBenchConfig, ProviderConfig, ScorerConfig } from "@llmbench/types";
+import type {
+	CacheConfig,
+	CIGateConfig,
+	LLMBenchConfig,
+	ProviderConfig,
+	ScorerConfig,
+} from "@llmbench/types";
 
 const CONFIG_FILES = ["llmbench.config.ts", "llmbench.config.js", "llmbench.config.mjs"];
 
@@ -73,6 +79,10 @@ export function validateConfig(config: unknown): asserts config is LLMBenchConfi
 
 	if (c.gate !== undefined) {
 		validateGateConfig(c.gate);
+	}
+
+	if (c.cache !== undefined) {
+		validateCacheConfig(c.cache);
 	}
 }
 
@@ -151,6 +161,24 @@ function validateGateConfig(gate: unknown): asserts gate is CIGateConfig {
 			if (typeof val !== "number" || val < 0 || val > 1) {
 				throw new Error(`gate.scorerThresholds["${key}"] must be a number between 0 and 1`);
 			}
+		}
+	}
+}
+
+function validateCacheConfig(cache: unknown): asserts cache is CacheConfig {
+	if (!cache || typeof cache !== "object") {
+		throw new Error("cache must be an object");
+	}
+
+	const c = cache as Record<string, unknown>;
+
+	if (c.enabled !== undefined && typeof c.enabled !== "boolean") {
+		throw new Error("cache.enabled must be a boolean");
+	}
+
+	if (c.ttlHours !== undefined) {
+		if (typeof c.ttlHours !== "number" || c.ttlHours <= 0) {
+			throw new Error("cache.ttlHours must be a positive number");
 		}
 	}
 }
