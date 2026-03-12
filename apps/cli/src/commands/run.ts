@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -106,6 +107,39 @@ function computeScorerAverages(allScores: Map<string, ScoreResult[]>): Record<st
 	return result;
 }
 
+function canonicalize(value: unknown): unknown {
+	if (value === null || value === undefined) return value;
+	if (Array.isArray(value)) return value.map(canonicalize);
+	if (typeof value === "object") {
+		const sorted: Record<string, unknown> = {};
+		for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+			sorted[key] = canonicalize((value as Record<string, unknown>)[key]);
+		}
+		return sorted;
+	}
+	return value;
+}
+
+function computeContentHash(
+	testCases: Array<{
+		input: string;
+		expected: string;
+		messages?: unknown;
+		context?: Record<string, unknown>;
+		tags?: string[];
+	}>,
+): string {
+	const semantic = testCases.map((tc) => ({
+		input: tc.input,
+		expected: tc.expected,
+		messages: tc.messages,
+		context: tc.context,
+		tags: tc.tags,
+	}));
+	const canonical = JSON.stringify(canonicalize(semantic));
+	return createHash("sha256").update(canonical).digest("hex");
+}
+
 export const runCommand = new Command("run")
 	.description("Run an evaluation")
 	.requiredOption("-d, --dataset <path>", "Path to dataset JSON file")
@@ -188,23 +222,29 @@ export const runCommand = new Command("run")
 				throw new Error("Dataset must contain at least one test case");
 			}
 
-			let dataset = (await datasetRepo.findByProjectId(project.id)).find(
-				(d) => d.name === (datasetJson.name || "Untitled Dataset"),
-			);
-			if (!dataset) {
-				dataset = await datasetRepo.create({
-					projectId: project.id,
-					name: datasetJson.name || "Untitled Dataset",
-					description: datasetJson.description,
-				});
+			const datasetName = datasetJson.name || "Untitled Dataset";
+			const incomingHash = computeContentHash(datasetJson.testCases);
+
+			// Find all versions of this dataset by name
+			const existingVersions = await datasetRepo.findByNameInProject(project.id, datasetName);
+
+			// Legacy backfill: compute and store hash for datasets that lack one
+			for (const ds of existingVersions) {
+				if (!ds.contentHash) {
+					const dbCases = await testCaseRepo.findByDatasetId(ds.id);
+					const backfillHash = computeContentHash(dbCases);
+					await datasetRepo.update(ds.id, { contentHash: backfillHash });
+					ds.contentHash = backfillHash;
+				}
 			}
 
-			// Create test cases
-			const existingCases = await testCaseRepo.findByDatasetId(dataset.id);
-			if (existingCases.length === 0) {
+			// Check if any existing version matches the incoming hash
+			let dataset = existingVersions.find((d) => d.contentHash === incomingHash);
+
+			const createTestCases = async (datasetId: string) => {
 				await testCaseRepo.createMany(
 					datasetJson.testCases.map((tc, i) => ({
-						datasetId: dataset.id,
+						datasetId,
 						input: tc.input,
 						expected: tc.expected,
 						messages: tc.messages as
@@ -215,6 +255,41 @@ export const runCommand = new Command("run")
 						orderIndex: i,
 					})),
 				);
+			};
+
+			if (dataset) {
+				// Unchanged (or reverted to a previous version)
+				if (spinner) {
+					spinner.text = `Dataset '${datasetName}' unchanged (v${dataset.version})`;
+				}
+			} else if (existingVersions.length === 0) {
+				// Brand new dataset
+				dataset = await datasetRepo.create({
+					projectId: project.id,
+					name: datasetName,
+					description: datasetJson.description,
+					contentHash: incomingHash,
+					version: 1,
+				});
+				await createTestCases(dataset.id);
+				if (spinner) {
+					spinner.text = `Dataset '${datasetName}' created (v1)`;
+				}
+			} else {
+				// Content changed — create new version
+				const latestVersion = existingVersions[0].version;
+				const newVersion = latestVersion + 1;
+				dataset = await datasetRepo.create({
+					projectId: project.id,
+					name: datasetName,
+					description: datasetJson.description,
+					contentHash: incomingHash,
+					version: newVersion,
+				});
+				await createTestCases(dataset.id);
+				if (spinner) {
+					spinner.text = `Dataset '${datasetName}' updated (v${latestVersion} → v${newVersion})`;
+				}
 			}
 
 			const testCases = await testCaseRepo.findByDatasetId(dataset.id);
@@ -263,6 +338,7 @@ export const runCommand = new Command("run")
 				},
 				totalCases: testCases.length * providerIds.length,
 				tags: options.tags?.split(","),
+				datasetVersion: dataset.version,
 			});
 
 			// Set up engine
