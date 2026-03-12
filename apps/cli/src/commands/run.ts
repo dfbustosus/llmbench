@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+	CacheManager,
 	CostCalculator,
 	createProvider,
 	createScorer,
@@ -10,6 +11,7 @@ import {
 	ThresholdGate,
 } from "@llmbench/core";
 import {
+	CacheRepository,
 	CostRecordRepository,
 	createDB,
 	DatasetRepository,
@@ -112,6 +114,8 @@ export const runCommand = new Command("run")
 	.option("--tags <tags>", "Comma-separated tags")
 	.option("--threshold <score>", "Minimum average score threshold (0-1); exits 1 on failure")
 	.option("--max-failure-rate <rate>", "Maximum failure rate (0-1); exits 1 if exceeded")
+	.option("--no-cache", "Disable response caching")
+	.option("--clear-cache", "Clear cache before running")
 	.option("--json", "Output results as JSON (for CI pipelines)")
 	.action(async (options) => {
 		const isJson = !!options.json;
@@ -134,6 +138,22 @@ export const runCommand = new Command("run")
 			const evalResultRepo = new EvalResultRepository(db);
 			const scoreRepo = new ScoreRepository(db);
 			const costRecordRepo = new CostRecordRepository(db);
+			const cacheRepo = new CacheRepository(db);
+
+			// Handle --clear-cache
+			if (options.clearCache) {
+				const deleted = await cacheRepo.deleteAll();
+				if (spinner) spinner.text = `Cleared ${deleted} cached responses`;
+			}
+
+			// Set up cache manager
+			const cacheEnabled = options.cache !== false && config.cache?.enabled !== false;
+			let cacheManager: CacheManager | undefined;
+			if (cacheEnabled) {
+				cacheManager = new CacheManager(cacheRepo, config.cache);
+				// Clean up expired entries
+				await cacheRepo.deleteExpired();
+			}
 
 			// Find or create project
 			const projects = await projectRepo.findAll();
@@ -254,6 +274,7 @@ export const runCommand = new Command("run")
 				scoreRepo,
 				costRecordRepo,
 				costCalculator: new CostCalculator(),
+				cacheManager,
 			});
 
 			// Listen to events for progress
@@ -288,6 +309,8 @@ export const runCommand = new Command("run")
 				gateResult = gate.evaluateRun(finalRun, allScores);
 			}
 
+			const cacheHitCount = engine.getCacheHits();
+
 			if (isJson) {
 				const scorerAvgs = computeScorerAverages(allScores);
 				const output = {
@@ -299,6 +322,7 @@ export const runCommand = new Command("run")
 					totalCost: finalRun?.totalCost ?? null,
 					avgLatencyMs: finalRun?.avgLatencyMs ?? null,
 					scores: scorerAvgs,
+					cacheHits: cacheHitCount,
 					...(gateResult ? { gate: gateResult } : {}),
 				};
 				console.log(JSON.stringify(output, null, 2));
@@ -316,6 +340,9 @@ export const runCommand = new Command("run")
 				}
 				if (finalRun?.avgLatencyMs) {
 					console.log(`  Avg latency: ${finalRun.avgLatencyMs.toFixed(0)}ms`);
+				}
+				if (cacheHitCount > 0) {
+					console.log(`  Cache: ${cacheHitCount} of ${finalRun?.totalCases ?? 0} from cache`);
 				}
 
 				if (gateResult && !gateResult.passed) {

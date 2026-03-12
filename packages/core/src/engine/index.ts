@@ -1,3 +1,4 @@
+export { CacheManager } from "./cache-manager.js";
 export { ConcurrencyManager } from "./concurrency-manager.js";
 export type { EngineOptions } from "./evaluation-engine.js";
 export { EvaluationEngine } from "./evaluation-engine.js";

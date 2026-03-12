@@ -1,3 +1,4 @@
+export { CacheRepository } from "./cache-repository.js";
 export { CostRecordRepository } from "./cost-record-repository.js";
 export { DatasetRepository } from "./dataset-repository.js";
 export { EvalResultRepository } from "./eval-result-repository.js";
