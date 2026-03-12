@@ -1,3 +1,4 @@
+export * from "./cache.js";
 export * from "./comparison.js";
 export * from "./config.js";
 export * from "./cost.js";

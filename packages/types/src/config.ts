@@ -1,3 +1,4 @@
+import type { CacheConfig } from "./cache.js";
 import type { CIGateConfig } from "./gate.js";
 import type { ProviderConfig } from "./provider.js";
 import type { ScorerConfig } from "./scoring.js";
@@ -19,4 +20,7 @@ export interface LLMBenchConfig {
 
 	/** CI gate thresholds. When configured, CLI commands exit 1 on violations. */
 	gate?: CIGateConfig;
+
+	/** Response caching configuration. Enabled by default. */
+	cache?: CacheConfig;
 }
