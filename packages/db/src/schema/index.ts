@@ -1,4 +1,4 @@
-import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const projects = sqliteTable("projects", {
 	id: text("id").primaryKey(),
@@ -134,6 +134,23 @@ export const scores = sqliteTable(
 		metadata: text("metadata"), // JSON
 	},
 	(table) => [index("idx_scores_result_id").on(table.resultId)],
+);
+
+export const cacheEntries = sqliteTable(
+	"cache_entries",
+	{
+		id: text("id").primaryKey(),
+		cacheKey: text("cache_key").notNull(),
+		model: text("model").notNull(),
+		input: text("input").notNull(),
+		output: text("output").notNull(),
+		tokenUsage: text("token_usage"), // JSON
+		latencyMs: real("latency_ms"),
+		createdAt: text("created_at").notNull(),
+		expiresAt: text("expires_at"),
+		hits: integer("hits").notNull().default(0),
+	},
+	(table) => [uniqueIndex("idx_cache_entries_key").on(table.cacheKey)],
 );
 
 export const costRecords = sqliteTable(

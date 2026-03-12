@@ -143,6 +143,21 @@ export function initializeDB(db: LLMBenchDB) {
 		)
 	`);
 
+	db.run(/* sql */ `
+		CREATE TABLE IF NOT EXISTS cache_entries (
+			id TEXT PRIMARY KEY,
+			cache_key TEXT NOT NULL,
+			model TEXT NOT NULL,
+			input TEXT NOT NULL,
+			output TEXT NOT NULL,
+			token_usage TEXT,
+			latency_ms REAL,
+			created_at TEXT NOT NULL,
+			expires_at TEXT,
+			hits INTEGER NOT NULL DEFAULT 0
+		)
+	`);
+
 	// Migrations for existing databases
 	try {
 		db.run(`ALTER TABLE test_cases ADD COLUMN messages TEXT`);
@@ -162,4 +177,5 @@ export function initializeDB(db: LLMBenchDB) {
 	);
 	db.run(`CREATE INDEX IF NOT EXISTS idx_scores_result_id ON scores(result_id)`);
 	db.run(`CREATE INDEX IF NOT EXISTS idx_cost_records_run_id ON cost_records(run_id)`);
+	db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_cache_entries_key ON cache_entries(cache_key)`);
 }

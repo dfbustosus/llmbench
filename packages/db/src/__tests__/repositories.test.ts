@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { LLMBenchDB } from "../client.js";
 import { createInMemoryDB, initializeDB } from "../client.js";
+import { CacheRepository } from "../repositories/cache-repository.js";
 import { CostRecordRepository } from "../repositories/cost-record-repository.js";
 import { DatasetRepository } from "../repositories/dataset-repository.js";
 import { EvalResultRepository } from "../repositories/eval-result-repository.js";
@@ -450,5 +451,154 @@ describe("CostRecordRepository", () => {
 		const found = await repo.findByRunId(run.id);
 		expect(found).toHaveLength(1);
 		expect(found[0].totalCost).toBe(0.09);
+	});
+});
+
+describe("CacheRepository", () => {
+	it("should create and find a cache entry by key", async () => {
+		const repo = new CacheRepository(db);
+		const entry = await repo.create({
+			cacheKey: "abc123",
+			model: "gpt-4",
+			input: "Hello",
+			output: "Hi there!",
+			tokenUsage: { inputTokens: 5, outputTokens: 3, totalTokens: 8 },
+			latencyMs: 150,
+		});
+
+		expect(entry.cacheKey).toBe("abc123");
+		expect(entry.model).toBe("gpt-4");
+		expect(entry.output).toBe("Hi there!");
+		expect(entry.hits).toBe(0);
+
+		const found = await repo.findByKey("abc123");
+		expect(found).not.toBeNull();
+		expect(found?.output).toBe("Hi there!");
+		expect(found?.tokenUsage).toEqual({ inputTokens: 5, outputTokens: 3, totalTokens: 8 });
+	});
+
+	it("should return null for non-existent key", async () => {
+		const repo = new CacheRepository(db);
+		const found = await repo.findByKey("nonexistent");
+		expect(found).toBeNull();
+	});
+
+	it("should increment hits", async () => {
+		const repo = new CacheRepository(db);
+		const entry = await repo.create({
+			cacheKey: "hit-test",
+			model: "gpt-4",
+			input: "Q",
+			output: "A",
+		});
+
+		await repo.incrementHits(entry.id);
+		await repo.incrementHits(entry.id);
+
+		const found = await repo.findByKey("hit-test");
+		expect(found?.hits).toBe(2);
+	});
+
+	it("should delete expired entries", async () => {
+		const repo = new CacheRepository(db);
+
+		// Create an expired entry
+		await repo.create({
+			cacheKey: "expired",
+			model: "gpt-4",
+			input: "Q",
+			output: "A",
+			expiresAt: new Date(Date.now() - 1000).toISOString(),
+		});
+
+		// Create a non-expired entry
+		await repo.create({
+			cacheKey: "valid",
+			model: "gpt-4",
+			input: "Q2",
+			output: "A2",
+			expiresAt: new Date(Date.now() + 86400000).toISOString(),
+		});
+
+		const deleted = await repo.deleteExpired();
+		expect(deleted).toBe(1);
+
+		const count = await repo.count();
+		expect(count).toBe(1);
+
+		const found = await repo.findByKey("valid");
+		expect(found).not.toBeNull();
+	});
+
+	it("should delete all entries", async () => {
+		const repo = new CacheRepository(db);
+		await repo.create({ cacheKey: "a", model: "gpt-4", input: "Q1", output: "A1" });
+		await repo.create({ cacheKey: "b", model: "gpt-4", input: "Q2", output: "A2" });
+
+		const deleted = await repo.deleteAll();
+		expect(deleted).toBe(2);
+
+		const count = await repo.count();
+		expect(count).toBe(0);
+	});
+
+	it("should count entries", async () => {
+		const repo = new CacheRepository(db);
+		expect(await repo.count()).toBe(0);
+
+		await repo.create({ cacheKey: "a", model: "gpt-4", input: "Q", output: "A" });
+		expect(await repo.count()).toBe(1);
+
+		await repo.create({ cacheKey: "b", model: "gpt-4", input: "Q", output: "A" });
+		expect(await repo.count()).toBe(2);
+	});
+
+	it("should not delete entries without expiresAt when deleting expired", async () => {
+		const repo = new CacheRepository(db);
+
+		// Entry without expiresAt (no TTL, should never expire)
+		await repo.create({ cacheKey: "permanent", model: "gpt-4", input: "Q", output: "A" });
+
+		// Entry that expired
+		await repo.create({
+			cacheKey: "expired",
+			model: "gpt-4",
+			input: "Q2",
+			output: "A2",
+			expiresAt: new Date(Date.now() - 1000).toISOString(),
+		});
+
+		const deleted = await repo.deleteExpired();
+		expect(deleted).toBe(1);
+
+		const count = await repo.count();
+		expect(count).toBe(1);
+
+		const permanent = await repo.findByKey("permanent");
+		expect(permanent).not.toBeNull();
+	});
+
+	it("should reject duplicate cache keys", async () => {
+		const repo = new CacheRepository(db);
+		await repo.create({ cacheKey: "dup", model: "gpt-4", input: "Q", output: "A" });
+
+		await expect(
+			repo.create({ cacheKey: "dup", model: "gpt-4", input: "Q2", output: "A2" }),
+		).rejects.toThrow();
+	});
+
+	it("should handle entry without tokenUsage", async () => {
+		const repo = new CacheRepository(db);
+		const entry = await repo.create({
+			cacheKey: "no-tokens",
+			model: "gpt-4",
+			input: "Q",
+			output: "A",
+		});
+
+		expect(entry.tokenUsage).toBeUndefined();
+
+		const found = await repo.findByKey("no-tokens");
+		expect(found?.tokenUsage).toBeUndefined();
 	});
 });
