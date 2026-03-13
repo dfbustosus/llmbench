@@ -24,10 +24,11 @@ import {
 	ScoreRepository,
 	TestCaseRepository,
 } from "@llmbench/db";
-import type { CIGateConfig, GateResult, IScorer, ScoreResult } from "@llmbench/types";
+import type { CIGateConfig, EvalRun, GateResult, IScorer, ScoreResult } from "@llmbench/types";
 import chalk from "chalk";
 import { Command } from "commander";
 import ora from "ora";
+import { exportRun } from "../exporters/index.js";
 import { renderResultsTable } from "../renderers/results-table.js";
 
 function validateDatasetJson(data: unknown): asserts data is {
@@ -151,6 +152,7 @@ export const runCommand = new Command("run")
 	.option("--no-cache", "Disable response caching")
 	.option("--clear-cache", "Clear cache before running")
 	.option("--json", "Output results as JSON (for CI pipelines)")
+	.option("-o, --output <file>", "Export results to file (.json, .csv, .html)")
 	.action(async (options) => {
 		const isJson = !!options.json;
 		const spinner = isJson ? null : ora("Loading configuration...").start();
@@ -387,8 +389,9 @@ export const runCommand = new Command("run")
 
 			const cacheHitCount = engine.getCacheHits();
 
+			const scorerAvgs = computeScorerAverages(allScores);
+
 			if (isJson) {
-				const scorerAvgs = computeScorerAverages(allScores);
 				const output = {
 					runId: run.id,
 					status: finalRun?.status,
@@ -430,6 +433,19 @@ export const runCommand = new Command("run")
 				} else if (gateResult) {
 					console.log();
 					console.log(chalk.bold.green("CI Gate: PASSED"));
+				}
+			}
+
+			if (options.output) {
+				const outputPath = resolve(process.cwd(), options.output);
+				exportRun(outputPath, {
+					results,
+					scores: allScores,
+					run: finalRun ?? ({} as EvalRun),
+					scorerAverages: scorerAvgs,
+				});
+				if (!isJson) {
+					console.log(chalk.green(`\nResults exported to ${outputPath}`));
 				}
 			}
 
