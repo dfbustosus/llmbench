@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { compareCommand } from "./commands/compare.js";
+import { evalCommand } from "./commands/eval.js";
 import { initCommand } from "./commands/init.js";
 import { listCommand } from "./commands/list.js";
 import { runCommand } from "./commands/run.js";
@@ -12,6 +13,7 @@ program.name("llmbench").description("LLM Benchmarking & Evaluation Platform").v
 
 program.addCommand(initCommand);
 program.addCommand(runCommand);
+program.addCommand(evalCommand);
 program.addCommand(listCommand);
 program.addCommand(serveCommand);
 program.addCommand(compareCommand);
