@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { DEFAULT_CONFIG, RunComparator, ThresholdGate } from "@llmbench/core";
 import {
 	createDB,
@@ -10,6 +11,7 @@ import type { GateResult } from "@llmbench/types";
 import chalk from "chalk";
 import Table from "cli-table3";
 import { Command } from "commander";
+import { exportCompare } from "../exporters/index.js";
 
 export const compareCommand = new Command("compare")
 	.description("Compare two evaluation runs")
@@ -23,6 +25,7 @@ export const compareCommand = new Command("compare")
 		"low",
 	)
 	.option("--json", "Output results as JSON (for CI pipelines)")
+	.option("-o, --output <file>", "Export results to file (.json, .csv, .html)")
 	.action(async (runIdA: string, runIdB: string, options) => {
 		const isJson = !!options.json;
 
@@ -134,6 +137,14 @@ export const compareCommand = new Command("compare")
 				} else if (gateResult) {
 					console.log();
 					console.log(chalk.bold.green("CI Gate: PASSED"));
+				}
+			}
+
+			if (options.output) {
+				const outputPath = resolve(process.cwd(), options.output);
+				exportCompare(outputPath, { result });
+				if (!isJson) {
+					console.log(chalk.green(`\nResults exported to ${outputPath}`));
 				}
 			}
 
