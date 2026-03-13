@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import {
 	CostCalculator,
 	createProvider,
@@ -30,6 +31,8 @@ import type {
 import chalk from "chalk";
 import { Command } from "commander";
 import ora from "ora";
+import type { EvalExportData } from "../exporters/index.js";
+import { exportEval } from "../exporters/index.js";
 
 const VALID_PROVIDER_TYPES = new Set<string>(["openai", "anthropic", "google", "ollama", "custom"]);
 
@@ -140,6 +143,7 @@ export const evalCommand = new Command("eval")
 	.option("--json", "Output results as JSON")
 	.option("--no-save", "Don't persist results to database")
 	.option("-c, --config <path>", "Config file path")
+	.option("-o, --output <file>", "Export results to file (.json, .csv, .html)")
 	.action(async (promptArg: string | undefined, options) => {
 		const isJson = !!options.json;
 		const spinner = isJson ? null : ora().start();
@@ -175,12 +179,20 @@ export const evalCommand = new Command("eval")
 			}
 
 			// 4. Choose save vs no-save path
+			let evalExportData: EvalExportData;
 			if (!options.save) {
 				// --no-save fast path: skip all DB operations
-				await runNoSave(prompt, providerConfigs, scorerConfigs, options.expected, isJson, spinner);
+				evalExportData = await runNoSave(
+					prompt,
+					providerConfigs,
+					scorerConfigs,
+					options.expected,
+					isJson,
+					spinner,
+				);
 			} else {
 				// Default: save to DB
-				await runWithSave(
+				evalExportData = await runWithSave(
 					prompt,
 					providerConfigs,
 					scorerConfigs,
@@ -189,6 +201,14 @@ export const evalCommand = new Command("eval")
 					spinner,
 					options.config,
 				);
+			}
+
+			if (options.output) {
+				const outputPath = resolve(process.cwd(), options.output);
+				exportEval(outputPath, evalExportData);
+				if (!isJson) {
+					console.log(chalk.green(`Results exported to ${outputPath}`));
+				}
 			}
 		} catch (error) {
 			if (spinner) spinner.fail("Eval failed");
@@ -202,7 +222,7 @@ export const evalCommand = new Command("eval")
 		}
 	});
 
-interface EvalResultData {
+export interface EvalResultData {
 	provider: string;
 	model: string;
 	output: string;
@@ -220,7 +240,7 @@ async function runNoSave(
 	expected: string | undefined,
 	isJson: boolean,
 	spinner: ReturnType<typeof ora> | null,
-): Promise<void> {
+): Promise<EvalExportData> {
 	const costCalculator = new CostCalculator();
 	const scorers: IScorer[] = scorerConfigs.map((sc) => createScorer(sc));
 	const results: EvalResultData[] = [];
@@ -270,6 +290,7 @@ async function runNoSave(
 
 	if (spinner) spinner.stop();
 	outputResults(prompt, expected, results, isJson);
+	return { prompt, expected, results };
 }
 
 async function runWithSave(
@@ -280,7 +301,7 @@ async function runWithSave(
 	isJson: boolean,
 	spinner: ReturnType<typeof ora> | null,
 	configPath: string | undefined,
-): Promise<void> {
+): Promise<EvalExportData> {
 	// Load config for dbPath
 	if (spinner) spinner.text = "Loading configuration...";
 	let dbPath = DEFAULT_CONFIG.dbPath ?? "./llmbench.db";
@@ -415,6 +436,7 @@ async function runWithSave(
 
 	if (spinner) spinner.succeed("Evaluation complete!");
 	outputResults(prompt, expected, results, isJson);
+	return { prompt, expected, results };
 }
 
 function outputResults(
