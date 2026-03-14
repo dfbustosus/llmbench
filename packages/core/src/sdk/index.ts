@@ -1,10 +1,10 @@
 export type {
 	CustomGenerateFn,
-	IEvaluateOptions,
-	IEvaluateQuickOptions,
-	IEvaluateResult,
-	IEvaluateSummary,
-	IResultWithScores,
-	ISimpleTestCase,
+	EvaluateOptions,
+	EvaluateQuickOptions,
+	EvaluateResult,
+	EvaluateSummary,
+	ResultWithScores,
+	SimpleTestCase,
 } from "./evaluate.js";
 export { evaluate, evaluateQuick } from "./evaluate.js";
