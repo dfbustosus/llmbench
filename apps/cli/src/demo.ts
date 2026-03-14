@@ -160,8 +160,6 @@ async function main() {
 	console.log();
 	console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 	console.log(`✓ Demo complete! Database saved to ${DB_PATH}`);
-
-	process.exit(0);
 }
 
 main().catch((err) => {
