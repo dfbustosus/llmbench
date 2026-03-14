@@ -2,29 +2,17 @@
  * LLMBench Demo — runs a full evaluation pipeline locally, no API keys needed.
  *
  * Usage:
- *   npx tsx demo/run-demo.ts
+ *   npx tsx apps/cli/src/demo.ts
  */
 
+import type { CustomGenerateFn } from "@llmbench/core";
+import { evaluate, RunComparator } from "@llmbench/core";
 import {
-	ContainsScorer,
-	CosineSimilarityScorer,
-	CostCalculator,
-	CustomProvider,
-	EvaluationEngine,
-	ExactMatchScorer,
-	RunComparator,
-} from "@llmbench/core";
-import {
-	CostRecordRepository,
 	createDB,
-	DatasetRepository,
 	EvalResultRepository,
 	EvalRunRepository,
 	initializeDB,
-	ProjectRepository,
-	ProviderRepository,
 	ScoreRepository,
-	TestCaseRepository,
 } from "@llmbench/db";
 
 // ── Fake LLM that returns canned answers ──────────────────────────────
@@ -36,218 +24,119 @@ const ANSWERS: Record<string, string> = {
 	"What is the largest planet?": "Jupiter is the largest planet in our solar system",
 };
 
-function createFakeProvider(name: string, accuracy: number) {
-	return new CustomProvider(
-		{ type: "custom", name, model: `fake-${name.toLowerCase()}` },
-		async (input) => {
-			const text = typeof input === "string" ? input : input.map((m) => m.content).join(" ");
+function createFakeGenerateFn(accuracy: number): CustomGenerateFn {
+	return async (input) => {
+		const text = typeof input === "string" ? input : input.map((m) => m.content).join(" ");
+		const latency = 50 + Math.random() * 200;
+		await new Promise((r) => setTimeout(r, latency));
 
-			// Simulate latency
-			const latency = 50 + Math.random() * 200;
-			await new Promise((r) => setTimeout(r, latency));
+		const answer = ANSWERS[text];
+		const correct = Math.random() < accuracy;
+		const output = correct && answer ? answer : "I don't know";
 
-			const answer = ANSWERS[text];
-			// Simulate accuracy — sometimes return wrong answer
-			const correct = Math.random() < accuracy;
-			const output = correct && answer ? answer : "I don't know";
-
-			return {
-				output,
-				latencyMs: latency,
-				tokenUsage: {
-					inputTokens: text.split(" ").length * 2,
-					outputTokens: output.split(" ").length * 2,
-					totalTokens: (text.split(" ").length + output.split(" ").length) * 2,
-				},
-			};
-		},
-	);
+		return {
+			output,
+			latencyMs: latency,
+			tokenUsage: {
+				inputTokens: text.split(" ").length * 2,
+				outputTokens: output.split(" ").length * 2,
+				totalTokens: (text.split(" ").length + output.split(" ").length) * 2,
+			},
+		};
+	};
 }
 
 // ── Main ──────────────────────────────────────────────────────────────
 async function main() {
 	console.log("╔═══════════════════════════════════════╗");
-	console.log("║       LLMBench Demo                   ║");
+	console.log("║       LLMBench Demo (SDK API)         ║");
 	console.log("╚═══════════════════════════════════════╝");
 	console.log();
 
-	// 1. Setup DB
-	const db = createDB("./demo-llmbench.db");
-	initializeDB(db);
-	console.log("✓ Database created (demo-llmbench.db)");
+	const DB_PATH = "./demo-llmbench.db";
 
-	const projectRepo = new ProjectRepository(db);
-	const datasetRepo = new DatasetRepository(db);
-	const testCaseRepo = new TestCaseRepository(db);
-	const providerRepo = new ProviderRepository(db);
-	const evalRunRepo = new EvalRunRepository(db);
-	const evalResultRepo = new EvalResultRepository(db);
-	const scoreRepo = new ScoreRepository(db);
-	const costRecordRepo = new CostRecordRepository(db);
+	const testCases = Object.entries(ANSWERS).map(([input, expected]) => ({ input, expected }));
 
-	// 2. Create project + dataset
-	const project = await projectRepo.create({
-		name: "Demo Project",
-		description: "Testing the full LLMBench pipeline",
-	});
-	console.log(`✓ Project created: ${project.name} (${project.id.slice(0, 8)})`);
+	const providers = [
+		{ type: "custom" as const, name: "GoodModel", model: "fake-goodmodel" },
+		{ type: "custom" as const, name: "BadModel", model: "fake-badmodel" },
+	];
 
-	const dataset = await datasetRepo.create({
-		projectId: project.id,
-		name: "General Knowledge",
-		description: "Basic Q&A test cases",
-	});
-
-	const testCases = [];
-	for (const [input, expected] of Object.entries(ANSWERS)) {
-		const tc = await testCaseRepo.create({
-			datasetId: dataset.id,
-			input,
-			expected,
-			orderIndex: testCases.length,
-		});
-		testCases.push(tc);
-	}
-	console.log(`✓ Dataset created: ${dataset.name} (${testCases.length} test cases)`);
-
-	// 3. Create two fake providers with different accuracy
-	const goodProvider = createFakeProvider("GoodModel", 0.9);
-	const badProvider = createFakeProvider("BadModel", 0.5);
-
-	const goodRecord = await providerRepo.create({
-		projectId: project.id,
-		type: "custom",
-		name: "GoodModel",
-		model: "fake-goodmodel",
-		config: {},
-	});
-	const badRecord = await providerRepo.create({
-		projectId: project.id,
-		type: "custom",
-		name: "BadModel",
-		model: "fake-badmodel",
-		config: {},
-	});
-
-	const providers = new Map([
-		[goodRecord.id, goodProvider],
-		[badRecord.id, badProvider],
+	const customProviders = new Map<string, CustomGenerateFn>([
+		["GoodModel", createFakeGenerateFn(0.9)],
+		["BadModel", createFakeGenerateFn(0.5)],
 	]);
 
-	console.log("✓ Providers: GoodModel (90% accuracy) vs BadModel (50% accuracy)");
+	const scorers = [
+		{ id: "exact-match", name: "Exact Match", type: "exact-match" as const },
+		{ id: "contains", name: "Contains", type: "contains" as const },
+		{ id: "cosine", name: "Cosine Similarity", type: "cosine-similarity" as const },
+	];
 
-	// 4. Create scorers
-	const scorers = [new ExactMatchScorer(), new ContainsScorer(), new CosineSimilarityScorer()];
-	console.log("✓ Scorers: Exact Match, Contains, Cosine Similarity");
-	console.log();
+	const sharedConfig = {
+		testCases,
+		providers,
+		scorers,
+		dbPath: DB_PATH,
+		projectName: "Demo Project",
+		datasetName: "General Knowledge",
+		concurrency: 3,
+		maxRetries: 1,
+		timeoutMs: 10000,
+		customProviders,
+		onEvent: (event: {
+			type: string;
+			completedCases?: number;
+			totalCases?: number;
+			failedCases?: number;
+		}) => {
+			if (event.type === "run:progress") {
+				process.stdout.write(
+					`\r  Progress: ${event.completedCases}/${event.totalCases} completed, ${event.failedCases} failed`,
+				);
+			}
+		},
+	};
 
 	// ── Run 1 ─────────────────────────────────────────────────────────
 	console.log("━━━ Run 1 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-	const run1 = await evalRunRepo.create({
-		projectId: project.id,
-		datasetId: dataset.id,
-		config: {
-			providerIds: [goodRecord.id, badRecord.id],
-			scorerConfigs: [],
-			concurrency: 3,
-			maxRetries: 1,
-			timeoutMs: 10000,
-		},
-		totalCases: testCases.length * 2,
-	});
+	const result1 = await evaluate(sharedConfig);
 
-	const engine1 = new EvaluationEngine({
-		providers,
-		scorers,
-		evalRunRepo,
-		evalResultRepo,
-		scoreRepo,
-		costRecordRepo,
-		costCalculator: new CostCalculator(),
-	});
-
-	engine1.onEvent((event) => {
-		if (event.type === "run:progress") {
-			process.stdout.write(
-				`\r  Progress: ${event.completedCases}/${event.totalCases} completed, ${event.failedCases} failed`,
-			);
-		}
-	});
-
-	await engine1.execute(run1, testCases);
 	console.log();
-
-	const finalRun1 = await evalRunRepo.findById(run1.id);
-	console.log(`  Status: ${finalRun1?.status}`);
-	console.log(`  Completed: ${finalRun1?.completedCases}/${finalRun1?.totalCases}`);
-	console.log(`  Failed: ${finalRun1?.failedCases}`);
-
-	// Print scores
-	const results1 = await evalResultRepo.findByRunId(run1.id);
+	console.log(`  Status: ${result1.status}`);
+	console.log(`  Completed: ${result1.summary.completedCases}/${result1.summary.totalCases}`);
+	console.log(`  Failed: ${result1.summary.failedCases}`);
+	console.log(`  Duration: ${result1.summary.durationMs}ms`);
 	console.log();
-	console.log("  Results:");
-	console.log("  ┌──────────────────────────────────────────────┐");
-	for (const r of results1) {
-		const provName = r.providerId === goodRecord.id ? "GoodModel" : "BadModel ";
-		const resultScores = await scoreRepo.findByResultId(r.id);
-		const exactScore = resultScores.find((s) => s.scorerName === "Exact Match");
-		const mark = exactScore?.value === 1 ? "✓" : "✗";
-		const inputShort = r.input.length > 30 ? `${r.input.slice(0, 30)}…` : r.input;
-		console.log(
-			`  │ ${mark} ${provName} │ ${inputShort.padEnd(32)} │ ${r.output.slice(0, 15).padEnd(15)} │`,
-		);
+	console.log("  Scorer Averages:");
+	for (const [name, avg] of Object.entries(result1.scorerAverages)) {
+		console.log(`    ${name}: ${avg.toFixed(3)}`);
 	}
-	console.log("  └──────────────────────────────────────────────┘");
 
-	// ── Run 2 (second run for comparison) ─────────────────────────────
+	// ── Run 2 (for comparison) ───────────────────────────────────────
 	console.log();
-	console.log("━━━ Run 2 (for comparison) ━━━━━━━━━━━━━━━━━━━━━━");
+	console.log("━━━ Run 2 (for comparison) ━━━━━━━━━━━━━━━━━━━━━━━━");
 
-	const run2 = await evalRunRepo.create({
-		projectId: project.id,
-		datasetId: dataset.id,
-		config: {
-			providerIds: [goodRecord.id, badRecord.id],
-			scorerConfigs: [],
-			concurrency: 3,
-			maxRetries: 1,
-			timeoutMs: 10000,
-		},
-		totalCases: testCases.length * 2,
-	});
+	const result2 = await evaluate(sharedConfig);
 
-	const engine2 = new EvaluationEngine({
-		providers,
-		scorers,
-		evalRunRepo,
-		evalResultRepo,
-		scoreRepo,
-		costRecordRepo,
-		costCalculator: new CostCalculator(),
-	});
-
-	engine2.onEvent((event) => {
-		if (event.type === "run:progress") {
-			process.stdout.write(
-				`\r  Progress: ${event.completedCases}/${event.totalCases} completed, ${event.failedCases} failed`,
-			);
-		}
-	});
-
-	await engine2.execute(run2, testCases);
 	console.log();
-
-	const finalRun2 = await evalRunRepo.findById(run2.id);
-	console.log(`  Status: ${finalRun2?.status}`);
-	console.log(`  Completed: ${finalRun2?.completedCases}/${finalRun2?.totalCases}`);
+	console.log(`  Status: ${result2.status}`);
+	console.log(`  Completed: ${result2.summary.completedCases}/${result2.summary.totalCases}`);
+	console.log(`  Duration: ${result2.summary.durationMs}ms`);
 	console.log();
 
 	// ── Compare runs ──────────────────────────────────────────────────
-	console.log("━━━ Run Comparison ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+	console.log("━━━ Run Comparison ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+	const db = createDB(DB_PATH);
+	initializeDB(db);
+	const evalRunRepo = new EvalRunRepository(db);
+	const evalResultRepo = new EvalResultRepository(db);
+	const scoreRepo = new ScoreRepository(db);
 
 	const comparator = new RunComparator(evalRunRepo, evalResultRepo, scoreRepo);
-	const comparison = await comparator.compare(run1.id, run2.id);
+	const comparison = await comparator.compare(result1.run.id, result2.run.id);
 
 	console.log("  Score Comparisons:");
 	for (const sc of comparison.scorerComparisons) {
@@ -269,21 +158,9 @@ async function main() {
 	}
 
 	console.log();
-	console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-	console.log("✓ Demo complete! Database saved to demo-llmbench.db");
-	console.log();
-	console.log("Next steps:");
-	console.log(
-		"  • View the web dashboard:  node apps/cli/dist/index.js serve --db demo-llmbench.db",
-	);
-	console.log(
-		"  • List runs:               node apps/cli/dist/index.js list --db demo-llmbench.db",
-	);
-	console.log(
-		`  • Compare runs:            node apps/cli/dist/index.js compare ${run1.id.slice(0, 8)} ${run2.id.slice(0, 8)} --db demo-llmbench.db`,
-	);
+	console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+	console.log(`✓ Demo complete! Database saved to ${DB_PATH}`);
 
-	// Cleanup
 	process.exit(0);
 }
 
