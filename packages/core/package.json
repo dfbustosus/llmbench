@@ -51,6 +51,10 @@
 		"./config": {
 			"types": "./dist/config/index.d.ts",
 			"import": "./dist/config/index.js"
+		},
+		"./sdk": {
+			"types": "./dist/sdk/index.d.ts",
+			"import": "./dist/sdk/index.js"
 		}
 	},
 	"scripts": {

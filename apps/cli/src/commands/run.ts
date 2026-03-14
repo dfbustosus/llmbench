@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import {
 	CacheManager,
 	CostCalculator,
+	computeScorerAverages,
 	createProvider,
 	createScorer,
 	EvaluationEngine,
@@ -24,7 +25,7 @@ import {
 	ScoreRepository,
 	TestCaseRepository,
 } from "@llmbench/db";
-import type { CIGateConfig, EvalRun, GateResult, IScorer, ScoreResult } from "@llmbench/types";
+import type { CIGateConfig, EvalRun, GateResult, IScorer } from "@llmbench/types";
 import chalk from "chalk";
 import { Command } from "commander";
 import ora from "ora";
@@ -89,23 +90,6 @@ function buildGateConfig(
 	}
 
 	return gate;
-}
-
-function computeScorerAverages(allScores: Map<string, ScoreResult[]>): Record<string, number> {
-	const totals = new Map<string, { sum: number; count: number }>();
-	for (const scoreList of allScores.values()) {
-		for (const score of scoreList) {
-			const existing = totals.get(score.scorerName) ?? { sum: 0, count: 0 };
-			existing.sum += score.value;
-			existing.count++;
-			totals.set(score.scorerName, existing);
-		}
-	}
-	const result: Record<string, number> = {};
-	for (const [name, { sum, count }] of totals) {
-		result[name] = count > 0 ? sum / count : 0;
-	}
-	return result;
 }
 
 function canonicalize(value: unknown): unknown {
@@ -371,12 +355,10 @@ export const runCommand = new Command("run")
 			await engine.execute(run, testCases);
 			if (spinner) spinner.succeed("Evaluation complete!");
 
-			// Collect results and scores
+			// Collect results and scores (single batch query)
 			const results = await evalResultRepo.findByRunId(run.id);
-			const allScores = new Map<string, ScoreResult[]>();
-			for (const result of results) {
-				allScores.set(result.id, await scoreRepo.findByResultId(result.id));
-			}
+			const scoresByResult = await scoreRepo.findByRunId(run.id);
+			const allScores = new Map(Object.entries(scoresByResult));
 
 			const finalRun = await evalRunRepo.findById(run.id);
 
@@ -389,7 +371,7 @@ export const runCommand = new Command("run")
 
 			const cacheHitCount = engine.getCacheHits();
 
-			const scorerAvgs = computeScorerAverages(allScores);
+			const scorerAvgs = computeScorerAverages(scoresByResult);
 
 			if (isJson) {
 				const output = {
