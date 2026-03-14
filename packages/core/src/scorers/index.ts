@@ -7,6 +7,7 @@ import { RegexScorer } from "./deterministic/regex.js";
 import { LLMJudgeScorer } from "./llm-judge/llm-judge.js";
 import { CosineSimilarityScorer } from "./semantic/cosine-similarity.js";
 
+export { computeScorerAverages } from "./averages.js";
 export * from "./composite/index.js";
 export * from "./deterministic/index.js";
 export * from "./llm-judge/index.js";
