@@ -1,4 +1,6 @@
+import type { LLMBenchDB } from "@llmbench/db";
 import {
+	CacheRepository,
 	CostRecordRepository,
 	createDB,
 	createInMemoryDB,
@@ -22,44 +24,50 @@ import type {
 	ScorerConfig,
 } from "@llmbench/types";
 import { CostCalculator } from "../cost/cost-calculator.js";
+import { CacheManager } from "../engine/cache-manager.js";
 import { EvaluationEngine } from "../engine/evaluation-engine.js";
 import type { CustomGenerateFn } from "../providers/custom-provider.js";
 import { createProvider } from "../providers/index.js";
+import { computeScorerAverages } from "../scorers/averages.js";
 import { createScorer } from "../scorers/index.js";
 
 export type { CustomGenerateFn } from "../providers/custom-provider.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
-/** Simplified test case — no id, datasetId, orderIndex */
-export interface ISimpleTestCase {
+/** Simplified test case — no id, datasetId, orderIndex. */
+export interface SimpleTestCase {
 	input: string;
-	expected: string;
+	expected?: string;
 	messages?: ChatMessage[];
 	context?: Record<string, unknown>;
 	tags?: string[];
 }
 
-/** Full options for evaluate() */
-export interface IEvaluateOptions {
-	testCases: ISimpleTestCase[];
+/** Full options for evaluate(). */
+export interface EvaluateOptions {
+	testCases: SimpleTestCase[];
 	providers: ProviderConfig[];
-	/** Defaults to [exact-match] if undefined; [] = no scoring */
+	/** Defaults to [exact-match] if undefined; [] = no scoring. */
 	scorers?: ScorerConfig[];
 	onEvent?: (event: EvalEvent) => void;
 	concurrency?: number;
 	maxRetries?: number;
 	timeoutMs?: number;
-	/** Omit = in-memory (no file written) */
+	/** Pre-existing DB handle. Caller manages initialization and lifecycle. */
+	db?: LLMBenchDB;
+	/** Create/open a DB at this path. Ignored when `db` is provided. Omit both for in-memory. */
 	dbPath?: string;
 	projectName?: string;
 	datasetName?: string;
-	/** For type:"custom" providers */
+	/** For type:"custom" providers. */
 	customProviders?: Map<string, CustomGenerateFn>;
+	/** Enable response caching. Only effective with a persistent DB. */
+	cache?: { ttlHours?: number };
 }
 
-/** Quick eval options — single prompt */
-export interface IEvaluateQuickOptions {
+/** Quick eval options — single prompt. */
+export interface EvaluateQuickOptions {
 	prompt: string;
 	expected?: string;
 	providers: ProviderConfig[];
@@ -68,20 +76,22 @@ export interface IEvaluateQuickOptions {
 	concurrency?: number;
 	maxRetries?: number;
 	timeoutMs?: number;
+	db?: LLMBenchDB;
 	dbPath?: string;
 	projectName?: string;
 	datasetName?: string;
 	customProviders?: Map<string, CustomGenerateFn>;
+	cache?: { ttlHours?: number };
 }
 
-/** Result with scores paired together */
-export interface IResultWithScores {
+/** Result with scores paired together. */
+export interface ResultWithScores {
 	result: EvalResult;
 	scores: ScoreResult[];
 }
 
-/** Summary stats */
-export interface IEvaluateSummary {
+/** Summary stats. */
+export interface EvaluateSummary {
 	totalCases: number;
 	completedCases: number;
 	failedCases: number;
@@ -91,42 +101,37 @@ export interface IEvaluateSummary {
 	durationMs: number;
 }
 
-/** Return value from evaluate() */
-export interface IEvaluateResult {
+/** Return value from evaluate(). */
+export interface EvaluateResult {
 	status: "completed" | "failed";
 	run: EvalRun;
-	results: IResultWithScores[];
-	scoresByResultId: Map<string, ScoreResult[]>;
-	summary: IEvaluateSummary;
+	results: ResultWithScores[];
+	scoresByResultId: Record<string, ScoreResult[]>;
+	summary: EvaluateSummary;
 	scorerAverages: Record<string, number>;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function computeScorerAverages(allScores: Map<string, ScoreResult[]>): Record<string, number> {
-	const totals = new Map<string, { sum: number; count: number }>();
-	for (const scoreList of allScores.values()) {
-		for (const score of scoreList) {
-			const existing = totals.get(score.scorerName) ?? { sum: 0, count: 0 };
-			existing.sum += score.value;
-			existing.count++;
-			totals.set(score.scorerName, existing);
-		}
-	}
-	const result: Record<string, number> = {};
-	for (const [name, { sum, count }] of totals) {
-		result[name] = count > 0 ? sum / count : 0;
-	}
-	return result;
-}
-
 const DEFAULT_SCORER_CONFIGS: ScorerConfig[] = [
 	{ id: "exact-match", name: "Exact Match", type: "exact-match" },
 ];
 
+function resolveDB(options: { db?: LLMBenchDB; dbPath?: string }): LLMBenchDB {
+	if (options.db) return options.db;
+	const db = options.dbPath ? createDB(options.dbPath) : createInMemoryDB();
+	initializeDB(db);
+	return db;
+}
+
+function sanitizeProviderConfig(config: ProviderConfig): Omit<ProviderConfig, "apiKey"> {
+	const { apiKey, ...safe } = config;
+	return safe;
+}
+
 // ── evaluate() ───────────────────────────────────────────────────────
 
-export async function evaluate(options: IEvaluateOptions): Promise<IEvaluateResult> {
+export async function evaluate(options: EvaluateOptions): Promise<EvaluateResult> {
 	const startTime = performance.now();
 
 	// 1. Validate inputs
@@ -138,18 +143,15 @@ export async function evaluate(options: IEvaluateOptions): Promise<IEvaluateResu
 	}
 
 	for (const pc of options.providers) {
-		if (pc.type === "custom") {
-			if (!options.customProviders?.has(pc.name)) {
-				throw new Error(
-					`Custom provider "${pc.name}" requires a matching entry in customProviders map`,
-				);
-			}
+		if (pc.type === "custom" && !options.customProviders?.has(pc.name)) {
+			throw new Error(
+				`Custom provider "${pc.name}" requires a matching entry in customProviders map`,
+			);
 		}
 	}
 
-	// 2. Create DB
-	const db = options.dbPath ? createDB(options.dbPath) : createInMemoryDB();
-	initializeDB(db);
+	// 2. Resolve DB
+	const db = resolveDB(options);
 
 	// 3. Instantiate repositories
 	const projectRepo = new ProjectRepository(db);
@@ -176,7 +178,7 @@ export async function evaluate(options: IEvaluateOptions): Promise<IEvaluateResu
 		options.testCases.map((tc, i) => ({
 			datasetId: dataset.id,
 			input: tc.input,
-			expected: tc.expected,
+			expected: tc.expected ?? "",
 			messages: tc.messages,
 			context: tc.context,
 			tags: tc.tags,
@@ -194,7 +196,7 @@ export async function evaluate(options: IEvaluateOptions): Promise<IEvaluateResu
 			type: pc.type,
 			name: pc.name,
 			model: pc.model,
-			config: {},
+			config: sanitizeProviderConfig(pc),
 		});
 
 		const customFn = pc.type === "custom" ? options.customProviders?.get(pc.name) : undefined;
@@ -226,7 +228,15 @@ export async function evaluate(options: IEvaluateOptions): Promise<IEvaluateResu
 		totalCases,
 	});
 
-	// 9. Construct engine
+	// 9. Set up cache (if requested)
+	let cacheManager: CacheManager | undefined;
+	if (options.cache) {
+		const cacheRepo = new CacheRepository(db);
+		await cacheRepo.deleteExpired();
+		cacheManager = new CacheManager(cacheRepo, { ttlHours: options.cache.ttlHours });
+	}
+
+	// 10. Construct engine
 	const engine = new EvaluationEngine({
 		providers: providerMap,
 		scorers,
@@ -235,41 +245,39 @@ export async function evaluate(options: IEvaluateOptions): Promise<IEvaluateResu
 		scoreRepo,
 		costRecordRepo,
 		costCalculator: new CostCalculator(),
+		cacheManager,
 	});
 
-	// 10. Wire onEvent
+	// 11. Wire onEvent
 	if (options.onEvent) {
 		engine.onEvent(options.onEvent);
 	}
 
-	// 11. Execute
+	// 12. Execute
 	await engine.execute(run, testCases);
 
-	// 12. Query results
+	// 13. Query results (single batch query — no N+1)
 	const finalRun = await evalRunRepo.findById(run.id);
 	if (!finalRun) {
 		throw new Error("Run not found after execution");
 	}
 
 	const evalResults = await evalResultRepo.findByRunId(run.id);
+	const scoresByResultId = await scoreRepo.findByRunId(run.id);
 
-	const scoresByResultId = new Map<string, ScoreResult[]>();
-	const resultsWithScores: IResultWithScores[] = [];
+	const resultsWithScores: ResultWithScores[] = evalResults.map((result) => ({
+		result,
+		scores: scoresByResultId[result.id] ?? [],
+	}));
 
-	for (const result of evalResults) {
-		const scores = await scoreRepo.findByResultId(result.id);
-		scoresByResultId.set(result.id, scores);
-		resultsWithScores.push({ result, scores });
-	}
-
-	// 13. Compute summary + scorer averages
+	// 14. Compute summary + scorer averages
 	const durationMs = Math.round(performance.now() - startTime);
 	const scorerAverages = computeScorerAverages(scoresByResultId);
 
 	const status: "completed" | "failed" =
 		finalRun.status === "completed" || finalRun.status === "failed" ? finalRun.status : "failed";
 
-	const summary: IEvaluateSummary = {
+	const summary: EvaluateSummary = {
 		totalCases: finalRun.totalCases,
 		completedCases: finalRun.completedCases,
 		failedCases: finalRun.failedCases,
@@ -291,12 +299,10 @@ export async function evaluate(options: IEvaluateOptions): Promise<IEvaluateResu
 
 // ── evaluateQuick() ──────────────────────────────────────────────────
 
-export async function evaluateQuick(options: IEvaluateQuickOptions): Promise<IEvaluateResult> {
+export async function evaluateQuick(options: EvaluateQuickOptions): Promise<EvaluateResult> {
 	const hasExpected = options.expected !== undefined;
 
-	const testCases: ISimpleTestCase[] = [
-		{ input: options.prompt, expected: options.expected ?? "" },
-	];
+	const testCases: SimpleTestCase[] = [{ input: options.prompt, expected: options.expected }];
 
 	// If no expected provided and no explicit scorers, skip scoring
 	const scorers =
@@ -314,9 +320,11 @@ export async function evaluateQuick(options: IEvaluateQuickOptions): Promise<IEv
 		concurrency: options.concurrency,
 		maxRetries: options.maxRetries,
 		timeoutMs: options.timeoutMs,
+		db: options.db,
 		dbPath: options.dbPath,
 		projectName: options.projectName,
 		datasetName: options.datasetName,
 		customProviders: options.customProviders,
+		cache: options.cache,
 	});
 }
