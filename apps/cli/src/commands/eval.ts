@@ -410,13 +410,17 @@ async function runWithSave(
 
 	await engine.execute(run, testCases);
 
-	// Collect results
+	// Collect results (single batch query — no N+1)
 	const evalResults = await evalResultRepo.findByRunId(run.id);
+	const allScoresByResult = await scoreRepo.findByRunId(run.id);
 	const results: EvalResultData[] = [];
 
 	for (const result of evalResults) {
-		const resultScores = await scoreRepo.findByResultId(result.id);
-		const pc = providerIdToConfig.get(result.providerId) ?? providerConfigs[0];
+		const resultScores = allScoresByResult[result.id] ?? [];
+		const pc = providerIdToConfig.get(result.providerId);
+		if (!pc) {
+			throw new Error(`Unknown provider ID in result: ${result.providerId}`);
+		}
 
 		results.push({
 			provider: pc.name,
