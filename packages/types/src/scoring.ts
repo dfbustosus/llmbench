@@ -33,3 +33,14 @@ export interface IScorer {
 
 	score(output: string, expected: string, input?: string): Promise<ScoreResult>;
 }
+
+/** Inline assertion on a single test case. Overrides global scorers when present. */
+export interface TestCaseAssertion {
+	type: ScorerType;
+	/** The expected value this assertion checks against. */
+	value: string;
+	/** Optional weight when computing a weighted average across assertions. */
+	weight?: number;
+	/** Scorer-specific options (e.g. caseSensitive, flags, partial). */
+	options?: Record<string, unknown>;
+}
