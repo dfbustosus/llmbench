@@ -20,7 +20,16 @@ export interface ProviderConfig {
 	extra?: Record<string, unknown>;
 }
 
-export type ProviderType = "openai" | "anthropic" | "google" | "ollama" | "custom";
+export type ProviderType =
+	| "openai"
+	| "azure-openai"
+	| "anthropic"
+	| "google"
+	| "mistral"
+	| "together"
+	| "bedrock"
+	| "ollama"
+	| "custom";
 
 export interface ProviderResponse {
 	output: string;
