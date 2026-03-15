@@ -1,6 +1,6 @@
 {
 	"name": "@llmbench/core",
-	"version": "0.1.5",
+	"version": "0.1.6",
 	"description": "Evaluation engine, providers, and scorers for LLMBench",
 	"type": "module",
 	"license": "Apache-2.0",
