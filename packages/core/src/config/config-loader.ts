@@ -120,7 +120,17 @@ function validateProviderConfig(
 	}
 
 	const p = provider as Record<string, unknown>;
-	const validTypes = ["openai", "anthropic", "google", "ollama", "custom"];
+	const validTypes = [
+		"openai",
+		"azure-openai",
+		"anthropic",
+		"google",
+		"mistral",
+		"together",
+		"bedrock",
+		"ollama",
+		"custom",
+	];
 
 	if (typeof p.type !== "string" || !validTypes.includes(p.type)) {
 		throw new Error(`providers[${index}].type must be one of: ${validTypes.join(", ")}`);
