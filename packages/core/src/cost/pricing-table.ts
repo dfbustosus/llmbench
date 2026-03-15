@@ -171,4 +171,106 @@ export const PRICING_TABLE: ModelPricing[] = [
 		inputPricePerMillion: 0.075,
 		outputPricePerMillion: 0.3,
 	},
+
+	// ── Mistral AI ──────────────────────────────────────────────────────
+	{
+		model: "mistral-large-latest",
+		provider: "mistral",
+		inputPricePerMillion: 0.5,
+		outputPricePerMillion: 1.5,
+	},
+	{
+		model: "mistral-small-latest",
+		provider: "mistral",
+		inputPricePerMillion: 0.1,
+		outputPricePerMillion: 0.3,
+	},
+	{
+		model: "mistral-medium-latest",
+		provider: "mistral",
+		inputPricePerMillion: 0.4,
+		outputPricePerMillion: 2,
+	},
+	{
+		model: "codestral-latest",
+		provider: "mistral",
+		inputPricePerMillion: 0.3,
+		outputPricePerMillion: 0.9,
+	},
+	{
+		model: "open-mistral-nemo",
+		provider: "mistral",
+		inputPricePerMillion: 0.02,
+		outputPricePerMillion: 0.04,
+	},
+
+	// ── Together AI ─────────────────────────────────────────────────────
+	{
+		model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+		provider: "together",
+		inputPricePerMillion: 0.88,
+		outputPricePerMillion: 0.88,
+	},
+	{
+		model: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+		provider: "together",
+		inputPricePerMillion: 0.27,
+		outputPricePerMillion: 0.85,
+	},
+	{
+		model: "deepseek-ai/DeepSeek-V3.1",
+		provider: "together",
+		inputPricePerMillion: 0.6,
+		outputPricePerMillion: 1.7,
+	},
+	{
+		model: "Qwen/Qwen3-235B-A22B-Instruct-2507-tput",
+		provider: "together",
+		inputPricePerMillion: 0.2,
+		outputPricePerMillion: 0.6,
+	},
+
+	// ── AWS Bedrock ─────────────────────────────────────────────────────
+	{
+		model: "anthropic.claude-sonnet-4-6",
+		provider: "bedrock",
+		inputPricePerMillion: 3,
+		outputPricePerMillion: 15,
+	},
+	{
+		model: "anthropic.claude-haiku-4-5-20251001-v1:0",
+		provider: "bedrock",
+		inputPricePerMillion: 1,
+		outputPricePerMillion: 5,
+	},
+	{
+		model: "anthropic.claude-opus-4-6-v1",
+		provider: "bedrock",
+		inputPricePerMillion: 5,
+		outputPricePerMillion: 25,
+	},
+	{
+		model: "meta.llama3-3-70b-instruct-v1:0",
+		provider: "bedrock",
+		inputPricePerMillion: 0.72,
+		outputPricePerMillion: 0.72,
+	},
+	{
+		model: "amazon.nova-pro-v1:0",
+		provider: "bedrock",
+		inputPricePerMillion: 0.8,
+		outputPricePerMillion: 3.2,
+	},
+	{
+		model: "amazon.nova-lite-v1:0",
+		provider: "bedrock",
+		inputPricePerMillion: 0.06,
+		outputPricePerMillion: 0.24,
+	},
+	{
+		model: "amazon.nova-micro-v1:0",
+		provider: "bedrock",
+		inputPricePerMillion: 0.035,
+		outputPricePerMillion: 0.14,
+	},
 ];
