@@ -13,7 +13,12 @@ export type ScorerType =
 	| "contains"
 	| "regex"
 	| "json-match"
+	| "json-schema"
 	| "cosine-similarity"
+	| "levenshtein"
+	| "bleu"
+	| "rouge"
+	| "embedding-similarity"
 	| "llm-judge"
 	| "composite"
 	| "custom";
