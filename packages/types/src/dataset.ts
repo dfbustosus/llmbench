@@ -17,5 +17,7 @@ export interface TestCase {
 	messages?: import("./provider.js").ChatMessage[];
 	context?: Record<string, unknown>;
 	tags?: string[];
+	/** Per-test-case assertions. When present, these override global scorers for this case. */
+	assert?: import("./scoring.js").TestCaseAssertion[];
 	orderIndex: number;
 }
