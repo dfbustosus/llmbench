@@ -68,7 +68,7 @@ export class EvaluationEngine {
 	}
 
 	private createScorerFromAssertion(assertion: TestCaseAssertion): IScorer {
-		const unsupportedInline = new Set(["llm-judge", "composite"]);
+		const unsupportedInline = new Set(["llm-judge", "composite", "embedding-similarity"]);
 		if (unsupportedInline.has(assertion.type)) {
 			throw new Error(
 				`Scorer type "${assertion.type}" cannot be used as an inline assertion. ` +

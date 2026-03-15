@@ -3,9 +3,15 @@ import { WeightedAverageScorer } from "./composite/weighted-average.js";
 import { ContainsScorer } from "./deterministic/contains.js";
 import { ExactMatchScorer } from "./deterministic/exact-match.js";
 import { JsonMatchScorer } from "./deterministic/json-match.js";
+import { JsonSchemaScorer } from "./deterministic/json-schema.js";
 import { RegexScorer } from "./deterministic/regex.js";
 import { LLMJudgeScorer } from "./llm-judge/llm-judge.js";
+import { BleuScorer } from "./semantic/bleu.js";
 import { CosineSimilarityScorer } from "./semantic/cosine-similarity.js";
+import type { EmbedFn } from "./semantic/embedding-similarity.js";
+import { EmbeddingSimilarityScorer } from "./semantic/embedding-similarity.js";
+import { LevenshteinScorer } from "./semantic/levenshtein.js";
+import { RougeScorer } from "./semantic/rouge.js";
 
 export { computeScorerAverages } from "./averages.js";
 export * from "./composite/index.js";
@@ -18,6 +24,8 @@ export interface CreateScorerOptions {
 	provider?: IProvider;
 	/** Required for composite type — array of { scorer, weight } */
 	components?: Array<{ scorer: IScorer; weight: number }>;
+	/** Required for embedding-similarity type */
+	embedFn?: EmbedFn;
 }
 
 export function createScorer(config: ScorerConfig, options?: CreateScorerOptions): IScorer {
@@ -41,8 +49,32 @@ export function createScorer(config: ScorerConfig, options?: CreateScorerOptions
 			return new JsonMatchScorer({
 				partial: opts.partial as boolean | undefined,
 			});
+		case "json-schema":
+			return new JsonSchemaScorer({
+				strict: opts.strict as boolean | undefined,
+			});
 		case "cosine-similarity":
 			return new CosineSimilarityScorer();
+		case "levenshtein":
+			return new LevenshteinScorer({
+				caseSensitive: opts.caseSensitive as boolean | undefined,
+			});
+		case "bleu":
+			return new BleuScorer({
+				maxN: opts.maxN as number | undefined,
+				weights: opts.weights as number[] | undefined,
+			});
+		case "rouge":
+			return new RougeScorer({
+				variant: opts.variant as "rouge-l" | "rouge-n" | undefined,
+				n: opts.n as number | undefined,
+			});
+		case "embedding-similarity": {
+			if (!options?.embedFn) {
+				throw new Error("Embedding similarity scorer requires an embedFn in options");
+			}
+			return new EmbeddingSimilarityScorer(options.embedFn);
+		}
 		case "llm-judge": {
 			if (!options?.provider) {
 				throw new Error("LLM judge scorer requires a provider in options");

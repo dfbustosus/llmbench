@@ -1,4 +1,5 @@
 import type { IScorer, ScoreResult, ScorerType } from "@llmbench/types";
+import { tokenize } from "./tokenizer.js";
 
 export class CosineSimilarityScorer implements IScorer {
 	readonly id = "cosine-similarity";
@@ -6,8 +7,8 @@ export class CosineSimilarityScorer implements IScorer {
 	readonly type: ScorerType = "cosine-similarity";
 
 	async score(output: string, expected: string): Promise<ScoreResult> {
-		const outputTokens = this.tokenize(output);
-		const expectedTokens = this.tokenize(expected);
+		const outputTokens = tokenize(output);
+		const expectedTokens = tokenize(expected);
 
 		const allTokens = new Set([...outputTokens, ...expectedTokens]);
 		const outputVec = this.vectorize(outputTokens, allTokens);
@@ -23,10 +24,6 @@ export class CosineSimilarityScorer implements IScorer {
 			rawValue: similarity,
 			reason: `Cosine similarity: ${similarity.toFixed(4)}`,
 		};
-	}
-
-	private tokenize(text: string): string[] {
-		return text.toLowerCase().split(/\W+/).filter(Boolean);
 	}
 
 	private vectorize(tokens: string[], vocabulary: Set<string>): number[] {
