@@ -13,9 +13,12 @@ import type {
 	ProviderConfig,
 	ProviderResponse,
 	ScoreResult,
+	ScorerConfig,
 	TestCase,
+	TestCaseAssertion,
 } from "@llmbench/types";
 import type { CostCalculator } from "../cost/cost-calculator.js";
+import { createScorer } from "../scorers/index.js";
 import type { CacheManager } from "./cache-manager.js";
 import { ConcurrencyManager } from "./concurrency-manager.js";
 import { EventBus } from "./event-bus.js";
@@ -62,6 +65,31 @@ export class EvaluationEngine {
 
 	onEvent(handler: (event: EvalEvent) => void): () => void {
 		return this.eventBus.on(handler);
+	}
+
+	private createScorerFromAssertion(assertion: TestCaseAssertion): IScorer {
+		const unsupportedInline = new Set(["llm-judge", "composite"]);
+		if (unsupportedInline.has(assertion.type)) {
+			throw new Error(
+				`Scorer type "${assertion.type}" cannot be used as an inline assertion. ` +
+					"Define it as a global scorer in your config instead.",
+			);
+		}
+
+		const name = assertion.type
+			.split("-")
+			.map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+			.join(" ");
+
+		const config: ScorerConfig = {
+			id: assertion.type,
+			name,
+			type: assertion.type,
+			weight: assertion.weight,
+			options: assertion.options,
+		};
+
+		return createScorer(config);
 	}
 
 	async execute(run: EvalRun, testCases: TestCase[]): Promise<void> {
@@ -114,6 +142,21 @@ export class EvaluationEngine {
 					});
 
 					try {
+						// Pre-create scorers from assertions before any provider call
+						// so invalid assertion types fail fast (no wasted API calls)
+						let caseScorers: Array<{ scorer: IScorer; expected: string }>;
+						if (testCase.assert && testCase.assert.length > 0) {
+							caseScorers = testCase.assert.map((a) => ({
+								scorer: this.createScorerFromAssertion(a),
+								expected: a.value,
+							}));
+						} else {
+							caseScorers = this.scorers.map((s) => ({
+								scorer: s,
+								expected: testCase.expected,
+							}));
+						}
+
 						// Interpolate templates with test case context
 						const context = testCase.context ?? {};
 						const hasContext = Object.keys(context).length > 0;
@@ -196,14 +239,10 @@ export class EvaluationEngine {
 							cost: cost.totalCost,
 						});
 
-						// Run scorers
+						// Run scorers (pre-created from assertions or global scorers)
 						const scores: ScoreResult[] = [];
-						for (const scorer of this.scorers) {
-							const scoreResult = await scorer.score(
-								response.output,
-								testCase.expected,
-								testCase.input,
-							);
+						for (const { scorer, expected } of caseScorers) {
+							const scoreResult = await scorer.score(response.output, expected, testCase.input);
 							scores.push(scoreResult);
 						}
 

@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { extname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type {
 	CacheConfig,
@@ -8,12 +8,21 @@ import type {
 	ProviderConfig,
 	ScorerConfig,
 } from "@llmbench/types";
+import { parse as parseYaml } from "yaml";
 
-const CONFIG_FILES = ["llmbench.config.ts", "llmbench.config.js", "llmbench.config.mjs"];
+const JS_CONFIG_FILES = ["llmbench.config.ts", "llmbench.config.js", "llmbench.config.mjs"];
+const YAML_CONFIG_FILES = ["llmbench.config.yaml", "llmbench.config.yml"];
+const CONFIG_FILES = [...JS_CONFIG_FILES, ...YAML_CONFIG_FILES];
+
+const YAML_EXTENSIONS = new Set([".yaml", ".yml"]);
+
+function isYamlFile(filePath: string): boolean {
+	return YAML_EXTENSIONS.has(extname(filePath).toLowerCase());
+}
 
 export async function loadConfig(configPath?: string): Promise<LLMBenchConfig> {
 	if (configPath) {
-		return importConfig(configPath);
+		return loadConfigFile(configPath);
 	}
 
 	const errors: string[] = [];
@@ -23,7 +32,7 @@ export async function loadConfig(configPath?: string): Promise<LLMBenchConfig> {
 		if (!existsSync(fullPath)) continue;
 
 		try {
-			return await importConfig(fullPath);
+			return await loadConfigFile(fullPath);
 		} catch (error) {
 			errors.push(`${file}: ${error instanceof Error ? error.message : String(error)}`);
 		}
@@ -33,15 +42,31 @@ export async function loadConfig(configPath?: string): Promise<LLMBenchConfig> {
 		throw new Error(`Failed to load config:\n${errors.map((e) => `  - ${e}`).join("\n")}`);
 	}
 
-	throw new Error("No llmbench config found. Create llmbench.config.ts or run 'llmbench init'.");
+	throw new Error(
+		"No llmbench config found. Create llmbench.config.ts (or .yaml) or run 'llmbench init'.",
+	);
 }
 
-async function importConfig(filePath: string): Promise<LLMBenchConfig> {
+async function loadConfigFile(filePath: string): Promise<LLMBenchConfig> {
 	const absolutePath = resolve(filePath);
 	if (!existsSync(absolutePath)) {
 		throw new Error(`Config file not found: ${absolutePath}`);
 	}
 
+	if (isYamlFile(absolutePath)) {
+		return loadYamlConfig(absolutePath);
+	}
+	return importJsConfig(absolutePath);
+}
+
+function loadYamlConfig(absolutePath: string): LLMBenchConfig {
+	const content = readFileSync(absolutePath, "utf-8");
+	const config = parseYaml(content);
+	validateConfig(config);
+	return config;
+}
+
+async function importJsConfig(absolutePath: string): Promise<LLMBenchConfig> {
 	const url = pathToFileURL(absolutePath).href;
 	const mod = await import(url);
 	const config = mod.default ?? mod.config ?? mod;

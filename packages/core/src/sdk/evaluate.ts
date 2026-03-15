@@ -22,6 +22,7 @@ import type {
 	ProviderConfig,
 	ScoreResult,
 	ScorerConfig,
+	TestCaseAssertion,
 } from "@llmbench/types";
 import { CostCalculator } from "../cost/cost-calculator.js";
 import { CacheManager } from "../engine/cache-manager.js";
@@ -42,6 +43,8 @@ export interface SimpleTestCase {
 	messages?: ChatMessage[];
 	context?: Record<string, unknown>;
 	tags?: string[];
+	/** Per-test-case assertions. When present, these override global scorers for this case. */
+	assert?: TestCaseAssertion[];
 }
 
 /** Full options for evaluate(). */
@@ -182,6 +185,7 @@ export async function evaluate(options: EvaluateOptions): Promise<EvaluateResult
 			messages: tc.messages,
 			context: tc.context,
 			tags: tc.tags,
+			assert: tc.assert,
 			orderIndex: i,
 		})),
 	);

@@ -64,9 +64,10 @@
 		"prepublishOnly": "pnpm run build"
 	},
 	"dependencies": {
-		"@llmbench/types": "workspace:*",
 		"@llmbench/db": "workspace:*",
-		"nanoid": "^5.1.5"
+		"@llmbench/types": "workspace:*",
+		"nanoid": "^5.1.5",
+		"yaml": "^2.8.2"
 	},
 	"devDependencies": {
 		"typescript": "^5.9.3",

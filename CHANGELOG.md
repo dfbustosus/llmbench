@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2026-03-15
+
+### Added
+
+- YAML config support — `llmbench.config.yaml` and `.yml` alongside TypeScript/JavaScript configs
+- YAML dataset support — `--dataset` flag now accepts `.yaml` and `.yml` files
+- Per-test-case assertions — `assert` field on test cases overrides global scorers with inline rules
+- `TestCaseAssertion` type with `type`, `value`, `weight`, and `options` fields
+- Dataset loader (`loadDataset()`) for JSON and YAML with full assertion validation
+- `--format yaml` option for `llmbench init` — generates YAML config + dataset with assertion examples
+- `llmbench eval` command — quick inline evaluation without dataset files
+  - Provider shorthand: `-p openai:gpt-4o`
+  - Expected output scoring: `-e "expected" -s exact-match`
+  - System message, temperature, max-tokens controls
+  - Stdin piping support
+  - `--no-save` fast path (skip DB)
+- Export system — `-o` flag on `run`, `eval`, and `compare` commands
+  - JSON export with full result metadata
+  - CSV export with scorer columns and summary sections
+  - HTML export with self-contained styled reports
+- `--json` flag for CI pipeline output on `run`, `eval`, and `compare`
+- `--no-cache` and `--clear-cache` flags for `run` command
+- `--threshold` and `--max-failure-rate` CI gate flags for `run` command
+- `--fail-on-regression` and `--min-severity` flags for `compare` command
+- SDK functions: `evaluate()` and `evaluateQuick()` for programmatic usage
+- Response caching with SHA-256 keys and optional TTL expiry
+- Dataset versioning with content hash tracking
+- `assert` column migration for existing databases
+
+### Changed
+
+- Config loader now searches `.yaml` and `.yml` in addition to `.ts`, `.js`, `.mjs`
+- `run` command dataset validation moved to shared `loadDataset()` in `@llmbench/core`
+- `EvaluationEngine` pre-creates scorers from assertions before provider calls (fail-fast)
+- Content hash computation includes `assert` field for dataset versioning
+- Updated documentation across all packages
+
 ## [0.1.4] - 2026-03-08
 
 ### Added

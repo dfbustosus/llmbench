@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
 	CacheManager,
@@ -9,6 +8,7 @@ import {
 	createScorer,
 	EvaluationEngine,
 	loadConfig,
+	loadDataset,
 	mergeWithDefaults,
 	ThresholdGate,
 } from "@llmbench/core";
@@ -32,34 +32,7 @@ import ora from "ora";
 import { exportRun } from "../exporters/index.js";
 import { renderResultsTable } from "../renderers/results-table.js";
 
-function validateDatasetJson(data: unknown): asserts data is {
-	name?: string;
-	description?: string;
-	testCases: Array<{
-		input: string;
-		expected: string;
-		messages?: Array<{ role: string; content: string }>;
-		context?: Record<string, unknown>;
-		tags?: string[];
-	}>;
-} {
-	if (!data || typeof data !== "object") {
-		throw new Error("Dataset file must contain a JSON object");
-	}
-	const obj = data as Record<string, unknown>;
-	if (!Array.isArray(obj.testCases)) {
-		throw new Error('Dataset file must have a "testCases" array');
-	}
-	for (let i = 0; i < obj.testCases.length; i++) {
-		const tc = obj.testCases[i] as Record<string, unknown>;
-		if (typeof tc.input !== "string") {
-			throw new Error(`testCases[${i}] must have a string "input" field`);
-		}
-		if (typeof tc.expected !== "string") {
-			throw new Error(`testCases[${i}] must have a string "expected" field`);
-		}
-	}
-}
+// Dataset validation is now handled by loadDataset() from @llmbench/core
 
 function buildGateConfig(
 	configGate: CIGateConfig | undefined,
@@ -112,6 +85,7 @@ function computeContentHash(
 		messages?: unknown;
 		context?: Record<string, unknown>;
 		tags?: string[];
+		assert?: unknown;
 	}>,
 ): string {
 	const semantic = testCases.map((tc) => ({
@@ -120,6 +94,7 @@ function computeContentHash(
 		messages: tc.messages,
 		context: tc.context,
 		tags: tc.tags,
+		assert: tc.assert,
 	}));
 	const canonical = JSON.stringify(canonicalize(semantic));
 	return createHash("sha256").update(canonical).digest("hex");
@@ -127,7 +102,7 @@ function computeContentHash(
 
 export const runCommand = new Command("run")
 	.description("Run an evaluation")
-	.requiredOption("-d, --dataset <path>", "Path to dataset JSON file")
+	.requiredOption("-d, --dataset <path>", "Path to dataset file (.json, .yaml, .yml)")
 	.option("-c, --config <path>", "Path to config file")
 	.option("--concurrency <number>", "Concurrency level", "5")
 	.option("--tags <tags>", "Comma-separated tags")
@@ -188,25 +163,7 @@ export const runCommand = new Command("run")
 			// Load and validate dataset
 			if (spinner) spinner.text = "Loading dataset...";
 			const datasetPath = resolve(process.cwd(), options.dataset);
-
-			if (!existsSync(datasetPath)) {
-				throw new Error(`Dataset file not found: ${datasetPath}`);
-			}
-
-			let datasetJson: unknown;
-			try {
-				datasetJson = JSON.parse(readFileSync(datasetPath, "utf-8"));
-			} catch (e) {
-				throw new Error(
-					`Failed to parse dataset JSON: ${e instanceof Error ? e.message : String(e)}`,
-				);
-			}
-
-			validateDatasetJson(datasetJson);
-
-			if (datasetJson.testCases.length === 0) {
-				throw new Error("Dataset must contain at least one test case");
-			}
+			const datasetJson = loadDataset(datasetPath);
 
 			const datasetName = datasetJson.name || "Untitled Dataset";
 			const incomingHash = computeContentHash(datasetJson.testCases);
@@ -238,6 +195,7 @@ export const runCommand = new Command("run")
 							| undefined,
 						context: tc.context,
 						tags: tc.tags,
+						assert: tc.assert,
 						orderIndex: i,
 					})),
 				);
