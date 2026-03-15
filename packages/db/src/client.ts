@@ -179,6 +179,12 @@ export function initializeDB(db: LLMBenchDB) {
 		// Column already exists
 	}
 
+	try {
+		db.run(`ALTER TABLE test_cases ADD COLUMN assert TEXT`);
+	} catch {
+		// Column already exists
+	}
+
 	// Create indexes
 	db.run(`CREATE INDEX IF NOT EXISTS idx_datasets_project_id ON datasets(project_id)`);
 	db.run(`CREATE INDEX IF NOT EXISTS idx_test_cases_dataset_id ON test_cases(dataset_id)`);
