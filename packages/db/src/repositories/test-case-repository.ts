@@ -1,4 +1,4 @@
-import type { ChatMessage, TestCase } from "@llmbench/types";
+import type { ChatMessage, TestCase, TestCaseAssertion } from "@llmbench/types";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { LLMBenchDB } from "../client.js";
@@ -14,6 +14,7 @@ export class TestCaseRepository {
 		messages?: ChatMessage[];
 		context?: Record<string, unknown>;
 		tags?: string[];
+		assert?: TestCaseAssertion[];
 		orderIndex?: number;
 	}): Promise<TestCase> {
 		const testCase = {
@@ -24,6 +25,7 @@ export class TestCaseRepository {
 			messages: data.messages ? JSON.stringify(data.messages) : null,
 			context: data.context ? JSON.stringify(data.context) : null,
 			tags: data.tags ? JSON.stringify(data.tags) : null,
+			assert: data.assert ? JSON.stringify(data.assert) : null,
 			orderIndex: data.orderIndex ?? 0,
 		};
 
@@ -37,6 +39,7 @@ export class TestCaseRepository {
 			messages: data.messages,
 			context: data.context,
 			tags: data.tags,
+			assert: data.assert,
 			orderIndex: testCase.orderIndex,
 		};
 	}
@@ -49,6 +52,7 @@ export class TestCaseRepository {
 			messages?: ChatMessage[];
 			context?: Record<string, unknown>;
 			tags?: string[];
+			assert?: TestCaseAssertion[];
 			orderIndex?: number;
 		}>,
 	): Promise<TestCase[]> {
@@ -91,6 +95,7 @@ export class TestCaseRepository {
 			messages: row.messages ? JSON.parse(row.messages) : undefined,
 			context: row.context ? JSON.parse(row.context) : undefined,
 			tags: row.tags ? JSON.parse(row.tags) : undefined,
+			assert: row.assert ? JSON.parse(row.assert) : undefined,
 			orderIndex: row.orderIndex,
 		};
 	}
