@@ -37,6 +37,7 @@ export const testCases = sqliteTable(
 		messages: text("messages"), // JSON - ChatMessage[]
 		context: text("context"), // JSON
 		tags: text("tags"), // JSON array
+		assert: text("assert"), // JSON - TestCaseAssertion[]
 		orderIndex: integer("order_index").notNull().default(0),
 	},
 	(table) => [index("idx_test_cases_dataset_id").on(table.datasetId)],
