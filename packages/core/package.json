@@ -67,6 +67,7 @@
 		"@llmbench/db": "workspace:*",
 		"@llmbench/types": "workspace:*",
 		"ajv": "^8.18.0",
+		"aws4fetch": "^1.0.20",
 		"nanoid": "^5.1.5",
 		"yaml": "^2.8.2"
 	},
