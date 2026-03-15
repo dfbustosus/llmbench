@@ -36,7 +36,12 @@ That's it. Four commands to go from zero to a full evaluation with a web dashboa
 - **Cost tracking** — Per-request token counts and cost breakdowns with built-in pricing tables.
 - **Web dashboard** — Next.js 15 app with charts, drill-down results, and run comparisons. Launches with `llmbench serve`.
 - **Local-first** — Everything stored in a single SQLite file. No cloud accounts, no external services, no data leaving your machine.
-- **TypeScript config** — Full type safety and autocompletion. No YAML, no JSON schemas.
+- **TypeScript or YAML config** — Use `llmbench.config.ts` with full type safety, or `llmbench.config.yaml` for zero-build setup.
+- **Per-test-case assertions** — Override global scorers on individual test cases with inline `assert` rules — like Promptfoo.
+- **Quick eval mode** — `llmbench eval "prompt" -p openai:gpt-4o` — test a single prompt without creating dataset files.
+- **Export & reporting** — Export results to JSON, CSV, or HTML. Use `--json` for CI artifacts.
+- **CI gates** — Set score thresholds and failure rate limits. Exit code 1 on violations for pipeline integration.
+- **Response caching** — Avoid duplicate API calls across re-runs. SHA-256 keyed, with optional TTL.
 
 ## Installation
 
