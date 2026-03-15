@@ -34,7 +34,17 @@ import ora from "ora";
 import type { EvalExportData } from "../exporters/index.js";
 import { exportEval } from "../exporters/index.js";
 
-const VALID_PROVIDER_TYPES = new Set<string>(["openai", "anthropic", "google", "ollama", "custom"]);
+const VALID_PROVIDER_TYPES = new Set<string>([
+	"openai",
+	"azure-openai",
+	"anthropic",
+	"google",
+	"mistral",
+	"together",
+	"bedrock",
+	"ollama",
+	"custom",
+]);
 
 const VALID_SCORER_TYPES = new Set<string>([
 	"exact-match",
