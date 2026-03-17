@@ -1,5 +1,5 @@
 import type { ScoreResult } from "@llmbench/types";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { LLMBenchDB } from "../client.js";
 import { evalResults, scores } from "../schema/index.js";
@@ -70,6 +70,20 @@ export class ScoreRepository {
 			result[row.resultId].push(score);
 		}
 		return result;
+	}
+
+	async deleteByRunId(runId: string): Promise<number> {
+		const resultRows = this.db
+			.select({ id: evalResults.id })
+			.from(evalResults)
+			.where(eq(evalResults.runId, runId))
+			.all();
+
+		if (resultRows.length === 0) return 0;
+
+		const resultIds = resultRows.map((r) => r.id);
+		const result = this.db.delete(scores).where(inArray(scores.resultId, resultIds)).run();
+		return result.changes;
 	}
 
 	private toScoreResult(row: typeof scores.$inferSelect): ScoreResult {

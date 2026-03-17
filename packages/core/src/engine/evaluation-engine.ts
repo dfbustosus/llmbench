@@ -13,16 +13,14 @@ import type {
 	ProviderConfig,
 	ProviderResponse,
 	ScoreResult,
-	ScorerConfig,
 	TestCase,
-	TestCaseAssertion,
 } from "@llmbench/types";
 import type { CostCalculator } from "../cost/cost-calculator.js";
-import { createScorer } from "../scorers/index.js";
 import type { CacheManager } from "./cache-manager.js";
 import { ConcurrencyManager } from "./concurrency-manager.js";
 import { EventBus } from "./event-bus.js";
 import { RetryHandler } from "./retry-handler.js";
+import { createScorerFromAssertion } from "./scorer-utils.js";
 import { interpolate, interpolateMessages } from "./template-engine.js";
 
 export interface EngineOptions {
@@ -65,31 +63,6 @@ export class EvaluationEngine {
 
 	onEvent(handler: (event: EvalEvent) => void): () => void {
 		return this.eventBus.on(handler);
-	}
-
-	private createScorerFromAssertion(assertion: TestCaseAssertion): IScorer {
-		const unsupportedInline = new Set(["llm-judge", "composite", "embedding-similarity"]);
-		if (unsupportedInline.has(assertion.type)) {
-			throw new Error(
-				`Scorer type "${assertion.type}" cannot be used as an inline assertion. ` +
-					"Define it as a global scorer in your config instead.",
-			);
-		}
-
-		const name = assertion.type
-			.split("-")
-			.map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
-			.join(" ");
-
-		const config: ScorerConfig = {
-			id: assertion.type,
-			name,
-			type: assertion.type,
-			weight: assertion.weight,
-			options: assertion.options,
-		};
-
-		return createScorer(config);
 	}
 
 	async execute(run: EvalRun, testCases: TestCase[]): Promise<void> {
@@ -147,7 +120,7 @@ export class EvaluationEngine {
 						let caseScorers: Array<{ scorer: IScorer; expected: string }>;
 						if (testCase.assert && testCase.assert.length > 0) {
 							caseScorers = testCase.assert.map((a) => ({
-								scorer: this.createScorerFromAssertion(a),
+								scorer: createScorerFromAssertion(a),
 								expected: a.value,
 							}));
 						} else {

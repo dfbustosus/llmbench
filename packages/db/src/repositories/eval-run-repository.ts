@@ -86,6 +86,15 @@ export class EvalRunRepository {
 			.run();
 	}
 
+	async updateConfig(id: string, config: EvalRunConfig): Promise<void> {
+		const now = new Date().toISOString();
+		this.db
+			.update(evalRuns)
+			.set({ config: JSON.stringify(config), updatedAt: now })
+			.where(eq(evalRuns.id, id))
+			.run();
+	}
+
 	async delete(id: string): Promise<boolean> {
 		const result = this.db.delete(evalRuns).where(eq(evalRuns.id, id)).run();
 		return result.changes > 0;
