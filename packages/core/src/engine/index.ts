@@ -3,5 +3,8 @@ export { ConcurrencyManager } from "./concurrency-manager.js";
 export type { EngineOptions } from "./evaluation-engine.js";
 export { EvaluationEngine } from "./evaluation-engine.js";
 export { EventBus } from "./event-bus.js";
+export type { RescoreEngineOptions, RescoreEngineResult } from "./rescoring-engine.js";
+export { RescoringEngine } from "./rescoring-engine.js";
 export { RetryHandler } from "./retry-handler.js";
+export { createScorerFromAssertion } from "./scorer-utils.js";
 export { interpolate, interpolateMessages } from "./template-engine.js";
