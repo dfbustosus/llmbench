@@ -5,7 +5,10 @@ export type EvalEvent =
 	| CaseFailedEvent
 	| RunProgressEvent
 	| RunCompletedEvent
-	| RunFailedEvent;
+	| RunFailedEvent
+	| RescoreStartedEvent
+	| RescoreProgressEvent
+	| RescoreCompletedEvent;
 
 export interface RunStartedEvent {
 	type: "run:started";
@@ -65,5 +68,28 @@ export interface RunFailedEvent {
 	type: "run:failed";
 	runId: string;
 	error: string;
+	timestamp: string;
+}
+
+export interface RescoreStartedEvent {
+	type: "rescore:started";
+	runId: string;
+	totalResults: number;
+	timestamp: string;
+}
+
+export interface RescoreProgressEvent {
+	type: "rescore:progress";
+	runId: string;
+	completedResults: number;
+	totalResults: number;
+	timestamp: string;
+}
+
+export interface RescoreCompletedEvent {
+	type: "rescore:completed";
+	runId: string;
+	totalResults: number;
+	scorerAverages: Record<string, number>;
 	timestamp: string;
 }
