@@ -3,11 +3,13 @@ import {
 	createDB,
 	EvalResultRepository,
 	EvalRunRepository,
+	EventRepository,
 	initializeDB,
 	ScoreRepository,
 	TestCaseRepository,
 } from "@llmbench/db";
 import type { EvalEvent, EvalRun, ScoreResult, ScorerConfig, TestCase } from "@llmbench/types";
+import { EventPersister } from "../engine/event-persister.js";
 import { RescoringEngine } from "../engine/rescoring-engine.js";
 import { computeScorerAverages } from "../scorers/averages.js";
 import type { CreateScorerOptions } from "../scorers/index.js";
@@ -87,6 +89,11 @@ export async function rescore(options: RescoreOptions): Promise<RescoreResult> {
 	if (options.onEvent) {
 		engine.onEvent(options.onEvent);
 	}
+
+	// Wire event persistence for persistent DBs
+	const eventRepo = new EventRepository(db);
+	const persister = new EventPersister(eventRepo);
+	engine.onEvent(persister.handler());
 
 	const engineResult = await engine.execute(
 		run.id,
