@@ -177,3 +177,15 @@ export const costRecords = sqliteTable(
 	},
 	(table) => [index("idx_cost_records_run_id").on(table.runId)],
 );
+
+export const evalEvents = sqliteTable(
+	"eval_events",
+	{
+		seq: integer("seq").primaryKey({ autoIncrement: true }),
+		runId: text("run_id").notNull(),
+		eventType: text("event_type").notNull(),
+		payload: text("payload").notNull(),
+		timestamp: text("timestamp").notNull(),
+	},
+	(table) => [index("idx_eval_events_run_id_seq").on(table.runId, table.seq)],
+);
