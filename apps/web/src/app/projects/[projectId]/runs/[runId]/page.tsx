@@ -9,9 +9,10 @@ import {
 	CardTitle,
 	CostDisplay,
 } from "@llmbench/ui";
-import { use, useMemo } from "react";
+import { use, useEffect, useMemo, useRef } from "react";
 import { LatencyChart } from "@/components/charts/latency-chart";
 import { ScoreDistributionChart } from "@/components/charts/score-distribution-chart";
+import { useRunEvents } from "@/hooks/use-run-events";
 import { trpc } from "@/trpc/client";
 
 export default function RunDetailPage({
@@ -20,6 +21,7 @@ export default function RunDetailPage({
 	params: Promise<{ projectId: string; runId: string }>;
 }) {
 	const { projectId, runId } = use(params);
+
 	const runQuery = trpc.evalRun.getById.useQuery(runId);
 	const resultsQuery = trpc.evalRun.getResults.useQuery(runId);
 	const scoresQuery = trpc.evalRun.getScoresByRunId.useQuery(runId);
@@ -28,6 +30,23 @@ export default function RunDetailPage({
 	const run = runQuery.data;
 	const results = resultsQuery.data ?? [];
 	const scoresByResultId = scoresQuery.data ?? {};
+
+	// Real-time SSE updates for active runs
+	const isActive = run?.status === "running" || run?.status === "pending";
+	const eventState = useRunEvents(runId, !!isActive);
+
+	// Refetch all queries when SSE stream transitions from live → not-live
+	const wasLiveRef = useRef(false);
+	useEffect(() => {
+		const wasLive = wasLiveRef.current;
+		wasLiveRef.current = eventState.isLive;
+		// Only refetch on the transition from live to not-live
+		if (wasLive && !eventState.isLive) {
+			runQuery.refetch();
+			resultsQuery.refetch();
+			scoresQuery.refetch();
+		}
+	}, [eventState.isLive, runQuery.refetch, resultsQuery.refetch, scoresQuery.refetch]);
 	const providers = providersQuery.data ?? [];
 
 	const providerMap = useMemo(() => {
@@ -100,7 +119,39 @@ export default function RunDetailPage({
 				>
 					{run.status}
 				</Badge>
+				{eventState.isLive && (
+					<span className="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 dark:text-green-400">
+						<span className="relative flex h-2 w-2">
+							<span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+							<span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+						</span>
+						Live
+					</span>
+				)}
 			</div>
+
+			{/* Progress bar for active runs */}
+			{eventState.isLive && eventState.totalCases > 0 && (
+				<div className="space-y-1">
+					<div className="flex justify-between text-sm text-muted-foreground">
+						<span>Progress</span>
+						<span>
+							{eventState.completedCases}/{eventState.totalCases}
+							{eventState.failedCases > 0 && (
+								<span className="text-destructive ml-1">({eventState.failedCases} failed)</span>
+							)}
+						</span>
+					</div>
+					<div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+						<div
+							className="h-full rounded-full bg-primary transition-all duration-300"
+							style={{
+								width: `${Math.round((eventState.completedCases / eventState.totalCases) * 100)}%`,
+							}}
+						/>
+					</div>
+				</div>
+			)}
 
 			{/* Summary Cards */}
 			<div className="grid gap-4 md:grid-cols-4">
@@ -108,7 +159,9 @@ export default function RunDetailPage({
 					<CardHeader>
 						<CardDescription>Completed</CardDescription>
 						<CardTitle className="text-2xl">
-							{run.completedCases}/{run.totalCases}
+							{eventState.isLive
+								? `${eventState.completedCases}/${eventState.totalCases}`
+								: `${run.completedCases}/${run.totalCases}`}
 						</CardTitle>
 					</CardHeader>
 				</Card>
