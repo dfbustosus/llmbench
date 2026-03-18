@@ -6,6 +6,7 @@ import { CostRecordRepository } from "../repositories/cost-record-repository.js"
 import { DatasetRepository } from "../repositories/dataset-repository.js";
 import { EvalResultRepository } from "../repositories/eval-result-repository.js";
 import { EvalRunRepository } from "../repositories/eval-run-repository.js";
+import { EventRepository } from "../repositories/event-repository.js";
 import { ProjectRepository } from "../repositories/project-repository.js";
 import { ProviderRepository } from "../repositories/provider-repository.js";
 import { ScoreRepository } from "../repositories/score-repository.js";
@@ -676,5 +677,140 @@ describe("CacheRepository", () => {
 
 		const found = await repo.findByKey("no-tokens");
 		expect(found?.tokenUsage).toBeUndefined();
+	});
+});
+
+describe("EventRepository", () => {
+	it("should insert and find events by cursor", async () => {
+		const repo = new EventRepository(db);
+
+		const e1 = repo.insert({
+			runId: "run-1",
+			eventType: "run:started",
+			payload: JSON.stringify({ type: "run:started", runId: "run-1" }),
+			timestamp: new Date().toISOString(),
+		});
+		const e2 = repo.insert({
+			runId: "run-1",
+			eventType: "run:progress",
+			payload: JSON.stringify({ type: "run:progress", runId: "run-1" }),
+			timestamp: new Date().toISOString(),
+		});
+
+		expect(e1.seq).toBeDefined();
+		expect(e2.seq).toBeGreaterThan(e1.seq);
+
+		const events = repo.findAfterCursor("run-1", 0);
+		expect(events).toHaveLength(2);
+		expect(events[0].eventType).toBe("run:started");
+		expect(events[1].eventType).toBe("run:progress");
+	});
+
+	it("should support cursor-based pagination", async () => {
+		const repo = new EventRepository(db);
+
+		const e1 = repo.insert({
+			runId: "run-1",
+			eventType: "run:started",
+			payload: "{}",
+			timestamp: new Date().toISOString(),
+		});
+		repo.insert({
+			runId: "run-1",
+			eventType: "run:progress",
+			payload: "{}",
+			timestamp: new Date().toISOString(),
+		});
+		repo.insert({
+			runId: "run-1",
+			eventType: "run:completed",
+			payload: "{}",
+			timestamp: new Date().toISOString(),
+		});
+
+		// After first event — should get 2 remaining
+		const after = repo.findAfterCursor("run-1", e1.seq);
+		expect(after).toHaveLength(2);
+		expect(after[0].eventType).toBe("run:progress");
+	});
+
+	it("should scope events by runId (no cross-run leakage)", async () => {
+		const repo = new EventRepository(db);
+
+		repo.insert({
+			runId: "run-1",
+			eventType: "run:started",
+			payload: "{}",
+			timestamp: new Date().toISOString(),
+		});
+		repo.insert({
+			runId: "run-2",
+			eventType: "run:started",
+			payload: "{}",
+			timestamp: new Date().toISOString(),
+		});
+
+		const run1Events = repo.findAfterCursor("run-1", 0);
+		expect(run1Events).toHaveLength(1);
+		expect(run1Events[0].runId).toBe("run-1");
+
+		const run2Events = repo.findAfterCursor("run-2", 0);
+		expect(run2Events).toHaveLength(1);
+		expect(run2Events[0].runId).toBe("run-2");
+	});
+
+	it("should delete events by runId", async () => {
+		const repo = new EventRepository(db);
+
+		repo.insert({
+			runId: "run-1",
+			eventType: "run:started",
+			payload: "{}",
+			timestamp: new Date().toISOString(),
+		});
+		repo.insert({
+			runId: "run-1",
+			eventType: "run:completed",
+			payload: "{}",
+			timestamp: new Date().toISOString(),
+		});
+		repo.insert({
+			runId: "run-2",
+			eventType: "run:started",
+			payload: "{}",
+			timestamp: new Date().toISOString(),
+		});
+
+		const deleted = repo.deleteByRunId("run-1");
+		expect(deleted).toBe(2);
+
+		const remaining = repo.findAfterCursor("run-1", 0);
+		expect(remaining).toHaveLength(0);
+
+		// run-2 events should be unaffected
+		const run2Events = repo.findAfterCursor("run-2", 0);
+		expect(run2Events).toHaveLength(1);
+	});
+
+	it("should return empty result for nonexistent run", async () => {
+		const repo = new EventRepository(db);
+		const events = repo.findAfterCursor("nonexistent", 0);
+		expect(events).toHaveLength(0);
+	});
+
+	it("should respect limit parameter", async () => {
+		const repo = new EventRepository(db);
+
+		for (let i = 0; i < 5; i++) {
+			repo.insert({
+				runId: "run-1",
+				eventType: "run:progress",
+				payload: "{}",
+				timestamp: new Date().toISOString(),
+			});
+		}
+
+		const limited = repo.findAfterCursor("run-1", 0, 2);
+		expect(limited).toHaveLength(2);
 	});
 });

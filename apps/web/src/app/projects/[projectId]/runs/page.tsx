@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@llmbench/ui";
-import { use } from "react";
+import { use, useEffect, useMemo } from "react";
 import { ScoreTrendChart } from "@/components/charts/score-trend-chart";
 import { trpc } from "@/trpc/client";
 
@@ -21,10 +21,23 @@ function statusVariant(status: string) {
 export default function RunsPage({ params }: { params: Promise<{ projectId: string }> }) {
 	const { projectId } = use(params);
 	const projectQuery = trpc.project.getById.useQuery(projectId);
+
 	const runsQuery = trpc.evalRun.listByProject.useQuery({ projectId });
+	const runs = runsQuery.data ?? [];
+
+	// Auto-refresh when any run is active
+	const hasActiveRun = useMemo(
+		() => runs.some((r) => r.status === "running" || r.status === "pending"),
+		[runs],
+	);
+	const { refetch: refetchRuns } = runsQuery;
+	useEffect(() => {
+		if (!hasActiveRun) return;
+		const timer = setInterval(() => refetchRuns(), 2000);
+		return () => clearInterval(timer);
+	}, [hasActiveRun, refetchRuns]);
 
 	const project = projectQuery.data;
-	const runs = runsQuery.data ?? [];
 
 	return (
 		<div className="space-y-8">
@@ -90,7 +103,12 @@ export default function RunsPage({ params }: { params: Promise<{ projectId: stri
 											</a>
 										</td>
 										<td className="py-3">
-											<Badge variant={statusVariant(run.status)}>{run.status}</Badge>
+											<Badge
+												variant={statusVariant(run.status)}
+												className={run.status === "running" ? "animate-pulse" : ""}
+											>
+												{run.status}
+											</Badge>
 										</td>
 										<td className="py-3">
 											{run.completedCases}/{run.totalCases}

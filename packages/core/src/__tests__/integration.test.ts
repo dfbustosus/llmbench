@@ -6,6 +6,7 @@ import {
 	DatasetRepository,
 	EvalResultRepository,
 	EvalRunRepository,
+	EventRepository,
 	initializeDB,
 	ProjectRepository,
 	ProviderRepository,
@@ -17,6 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CostCalculator } from "../cost/cost-calculator.js";
 import { CacheManager } from "../engine/cache-manager.js";
 import { EvaluationEngine } from "../engine/evaluation-engine.js";
+import { EventPersister } from "../engine/event-persister.js";
 import { CustomProvider } from "../providers/custom-provider.js";
 import { ContainsScorer } from "../scorers/deterministic/contains.js";
 import { ExactMatchScorer } from "../scorers/deterministic/exact-match.js";
@@ -340,6 +342,101 @@ describe("Integration: full evaluation pipeline", () => {
 		// Verify cache entry count
 		const cacheCount = await cacheRepo.count();
 		expect(cacheCount).toBe(1);
+	});
+
+	it("should persist events to DB via EventPersister", async () => {
+		const db = createInMemoryDB();
+		initializeDB(db);
+
+		const projectRepo = new ProjectRepository(db);
+		const datasetRepo = new DatasetRepository(db);
+		const testCaseRepo = new TestCaseRepository(db);
+		const providerRepo = new ProviderRepository(db);
+		const evalRunRepo = new EvalRunRepository(db);
+		const evalResultRepo = new EvalResultRepository(db);
+		const scoreRepo = new ScoreRepository(db);
+		const costRecordRepo = new CostRecordRepository(db);
+		const eventRepo = new EventRepository(db);
+
+		const project = await projectRepo.create({ name: "Persist Test" });
+		const dataset = await datasetRepo.create({
+			projectId: project.id,
+			name: "Persist Dataset",
+		});
+
+		const tc = await testCaseRepo.create({
+			datasetId: dataset.id,
+			input: "What is 1+1?",
+			expected: "2",
+			orderIndex: 0,
+		});
+
+		const provRecord = await providerRepo.create({
+			projectId: project.id,
+			type: "custom",
+			name: "MockLLM",
+			model: "mock-v1",
+			config: {},
+		});
+
+		const mockProvider = new CustomProvider(
+			{ type: "custom", name: "MockLLM", model: "mock-v1" },
+			async () => ({
+				output: "2",
+				latencyMs: 10,
+				tokenUsage: { inputTokens: 5, outputTokens: 1, totalTokens: 6 },
+			}),
+		);
+
+		const engine = new EvaluationEngine({
+			providers: new Map([[provRecord.id, mockProvider]]),
+			scorers: [new ExactMatchScorer()],
+			evalRunRepo,
+			evalResultRepo,
+			scoreRepo,
+			costRecordRepo,
+			costCalculator: new CostCalculator(),
+		});
+
+		// Wire EventPersister
+		const persister = new EventPersister(eventRepo);
+		engine.onEvent(persister.handler());
+
+		const run = await evalRunRepo.create({
+			projectId: project.id,
+			datasetId: dataset.id,
+			config: {
+				providerIds: [provRecord.id],
+				scorerConfigs: [],
+				concurrency: 1,
+				maxRetries: 0,
+				timeoutMs: 5000,
+			},
+			totalCases: 1,
+		});
+
+		await engine.execute(run, [tc]);
+
+		// Verify events were persisted in correct order
+		const dbEvents = eventRepo.findAfterCursor(run.id, 0);
+		expect(dbEvents.length).toBeGreaterThanOrEqual(3);
+
+		const eventTypes = dbEvents.map((e) => e.eventType);
+		expect(eventTypes[0]).toBe("run:started");
+		expect(eventTypes[eventTypes.length - 1]).toBe("run:completed");
+		expect(eventTypes).toContain("run:progress");
+
+		// Verify seq is monotonically increasing
+		for (let i = 1; i < dbEvents.length; i++) {
+			expect(dbEvents[i].seq).toBeGreaterThan(dbEvents[i - 1].seq);
+		}
+
+		// Verify payload is valid JSON
+		for (const ev of dbEvents) {
+			const payload = JSON.parse(ev.payload);
+			expect(payload.type).toBe(ev.eventType);
+			expect(payload.runId).toBe(run.id);
+		}
 	});
 });
 

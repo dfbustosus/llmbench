@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import {
 	computeScorerAverages,
 	createScorer,
+	EventPersister,
 	loadConfig,
 	mergeWithDefaults,
 	RescoringEngine,
@@ -10,6 +11,7 @@ import {
 	createDB,
 	EvalResultRepository,
 	EvalRunRepository,
+	EventRepository,
 	initializeDB,
 	ScoreRepository,
 	TestCaseRepository,
@@ -90,6 +92,11 @@ export const rescoreCommand = new Command("rescore")
 				evalResultRepo,
 				scoreRepo,
 			});
+
+			// Wire event persistence for real-time dashboard
+			const eventRepo = new EventRepository(db);
+			const persister = new EventPersister(eventRepo);
+			engine.onEvent(persister.handler());
 
 			let lastProgress = 0;
 			engine.onEvent((event) => {

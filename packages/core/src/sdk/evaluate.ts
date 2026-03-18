@@ -7,6 +7,7 @@ import {
 	DatasetRepository,
 	EvalResultRepository,
 	EvalRunRepository,
+	EventRepository,
 	initializeDB,
 	ProjectRepository,
 	ProviderRepository,
@@ -27,6 +28,7 @@ import type {
 import { CostCalculator } from "../cost/cost-calculator.js";
 import { CacheManager } from "../engine/cache-manager.js";
 import { EvaluationEngine } from "../engine/evaluation-engine.js";
+import { EventPersister } from "../engine/event-persister.js";
 import type { CustomGenerateFn } from "../providers/custom-provider.js";
 import { createProvider } from "../providers/index.js";
 import { computeScorerAverages } from "../scorers/averages.js";
@@ -255,6 +257,13 @@ export async function evaluate(options: EvaluateOptions): Promise<EvaluateResult
 	// 11. Wire onEvent
 	if (options.onEvent) {
 		engine.onEvent(options.onEvent);
+	}
+
+	// 11b. Wire event persistence for persistent DBs (not in-memory)
+	if (options.dbPath || options.db) {
+		const eventRepo = new EventRepository(db);
+		const persister = new EventPersister(eventRepo);
+		engine.onEvent(persister.handler());
 	}
 
 	// 12. Execute

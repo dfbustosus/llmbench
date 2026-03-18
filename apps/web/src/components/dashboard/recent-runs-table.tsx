@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge, CostDisplay } from "@llmbench/ui";
+import { useEffect, useMemo } from "react";
 import { trpc } from "@/trpc/client";
 
 function statusVariant(status: string) {
@@ -9,6 +10,8 @@ function statusVariant(status: string) {
 			return "success" as const;
 		case "failed":
 			return "destructive" as const;
+		case "running":
+			return "default" as const;
 		default:
 			return "secondary" as const;
 	}
@@ -21,6 +24,18 @@ export function RecentRunsTable({ projectId }: { projectId: string }) {
 	});
 
 	const runs = runsQuery.data ?? [];
+
+	// Auto-refresh when any run is active
+	const hasActiveRun = useMemo(
+		() => runs.some((r) => r.status === "running" || r.status === "pending"),
+		[runs],
+	);
+	const { refetch } = runsQuery;
+	useEffect(() => {
+		if (!hasActiveRun) return;
+		const timer = setInterval(() => refetch(), 2000);
+		return () => clearInterval(timer);
+	}, [hasActiveRun, refetch]);
 
 	if (runs.length === 0) {
 		return <p className="text-muted-foreground text-sm">No runs yet.</p>;

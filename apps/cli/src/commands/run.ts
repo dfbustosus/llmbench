@@ -7,6 +7,7 @@ import {
 	createProvider,
 	createScorer,
 	EvaluationEngine,
+	EventPersister,
 	loadConfig,
 	loadDataset,
 	mergeWithDefaults,
@@ -19,6 +20,7 @@ import {
 	DatasetRepository,
 	EvalResultRepository,
 	EvalRunRepository,
+	EventRepository,
 	initializeDB,
 	ProjectRepository,
 	ProviderRepository,
@@ -296,6 +298,14 @@ export const runCommand = new Command("run")
 				costCalculator: new CostCalculator(),
 				cacheManager,
 			});
+
+			// Wire event persistence for real-time dashboard
+			const eventRepo = new EventRepository(db);
+			const persister = new EventPersister(eventRepo);
+			engine.onEvent(persister.handler());
+
+			// Lazy cleanup of stale events from past runs
+			eventRepo.deleteStale();
 
 			// Listen to events for progress
 			let lastProgress = 0;

@@ -3,6 +3,8 @@ export { CostRecordRepository } from "./cost-record-repository.js";
 export { DatasetRepository } from "./dataset-repository.js";
 export { EvalResultRepository } from "./eval-result-repository.js";
 export { EvalRunRepository } from "./eval-run-repository.js";
+export type { EvalEventRow } from "./event-repository.js";
+export { EventRepository } from "./event-repository.js";
 export { ProjectRepository } from "./project-repository.js";
 export type { ProviderRecord } from "./provider-repository.js";
 export { ProviderRepository } from "./provider-repository.js";
