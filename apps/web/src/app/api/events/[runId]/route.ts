@@ -11,9 +11,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ runId: s
 	// Read cursor from Last-Event-ID header (SSE reconnect) or query param (initial)
 	const lastEventId = req.headers.get("Last-Event-ID");
 	const url = new URL(req.url);
-	const cursor = lastEventId
-		? Number(lastEventId)
-		: Number(url.searchParams.get("cursor") ?? "0");
+	const cursor = lastEventId ? Number(lastEventId) : Number(url.searchParams.get("cursor") ?? "0");
 
 	const eventRepo = new EventRepository(getDB());
 
@@ -53,9 +51,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ runId: s
 					let foundTerminal = false;
 
 					for (const event of events) {
-						send(
-							`event: ${event.eventType}\nid: ${event.seq}\ndata: ${event.payload}\n\n`,
-						);
+						send(`event: ${event.eventType}\nid: ${event.seq}\ndata: ${event.payload}\n\n`);
 						currentCursor = event.seq;
 						if (TERMINAL_EVENTS.has(event.eventType)) {
 							foundTerminal = true;
