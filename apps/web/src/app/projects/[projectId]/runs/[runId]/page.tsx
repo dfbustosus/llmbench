@@ -35,6 +35,12 @@ export default function RunDetailPage({
 		onError: (err) => setDeleteError(err.message),
 	});
 
+	const cancelMutation = trpc.evalRun.cancel.useMutation({
+		onSuccess: () => {
+			runQuery.refetch();
+		},
+	});
+
 	const runQuery = trpc.evalRun.getById.useQuery(runId);
 	const resultsQuery = trpc.evalRun.getResults.useQuery(runId);
 	const scoresQuery = trpc.evalRun.getScoresByRunId.useQuery(runId);
@@ -127,11 +133,23 @@ export default function RunDetailPage({
 							? "success"
 							: run.status === "failed"
 								? "destructive"
-								: "secondary"
+								: run.status === "cancelled"
+									? "warning"
+									: "secondary"
 					}
 				>
 					{run.status}
 				</Badge>
+				{isActive && (
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={cancelMutation.isPending}
+						onClick={() => cancelMutation.mutate(runId)}
+					>
+						{cancelMutation.isPending ? "Cancelling..." : "Cancel Run"}
+					</Button>
+				)}
 				<Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
 					Delete Run
 				</Button>
