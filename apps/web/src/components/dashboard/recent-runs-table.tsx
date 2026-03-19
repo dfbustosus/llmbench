@@ -12,16 +12,20 @@ function statusVariant(status: string) {
 			return "destructive" as const;
 		case "running":
 			return "default" as const;
+		case "cancelled":
+			return "warning" as const;
 		default:
 			return "secondary" as const;
 	}
 }
 
-export function RecentRunsTable({ projectId }: { projectId: string }) {
-	const runsQuery = trpc.evalRun.listByProject.useQuery({
-		projectId,
-		limit: 10,
-	});
+export function RecentRunsTable({ projectId }: { projectId?: string }) {
+	const recentQuery = trpc.evalRun.recent.useQuery({ limit: 10 }, { enabled: !projectId });
+	const projectQuery = trpc.evalRun.listByProject.useQuery(
+		{ projectId: projectId ?? "", limit: 10 },
+		{ enabled: !!projectId },
+	);
+	const runsQuery = projectId ? projectQuery : recentQuery;
 
 	const runs = runsQuery.data ?? [];
 
