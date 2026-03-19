@@ -113,6 +113,59 @@ import { CostDisplay } from "@llmbench/ui";
 <CostDisplay cost={0.05} className="text-red-500" />
 ```
 
+### Dialog
+
+Modal dialog built on Radix UI primitives:
+
+```tsx
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@llmbench/ui";
+
+<Dialog open={open} onOpenChange={setOpen}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Create Project</DialogTitle>
+      <DialogDescription>Add a new evaluation project.</DialogDescription>
+    </DialogHeader>
+    {/* form content */}
+    <DialogFooter>
+      <Button onClick={() => setOpen(false)}>Cancel</Button>
+      <Button onClick={handleCreate}>Create</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+```
+
+### ConfirmDialog
+
+Pre-built confirmation dialog with loading and error states:
+
+```tsx
+import { ConfirmDialog } from "@llmbench/ui";
+
+<ConfirmDialog
+  open={open}
+  onOpenChange={setOpen}
+  title="Delete Run"
+  description="This will permanently delete this evaluation run."
+  onConfirm={() => deleteMutation.mutate(runId)}
+  loading={deleteMutation.isPending}
+  error={errorMessage}
+/>
+```
+
+### Form Components
+
+```tsx
+import { Input, Label, Select, Textarea } from "@llmbench/ui";
+
+<Label htmlFor="name">Project Name</Label>
+<Input id="name" placeholder="my-project" />
+<Textarea placeholder="Description..." />
+<Select value={value} onChange={handleChange}>
+  <option value="openai">OpenAI</option>
+</Select>
+```
+
 ## Utilities
 
 ### `cn` — Class Name Merger

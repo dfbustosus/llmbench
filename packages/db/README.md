@@ -243,20 +243,58 @@ await repo.create({
 const costRecords = await repo.findByRunId(run.id);
 ```
 
+### ProviderRepository
+
+```typescript
+const repo = new ProviderRepository(db);
+
+const provider = await repo.create({
+  projectId: project.id,
+  type: "openai",
+  name: "GPT-4o",
+  model: "gpt-4o",
+  config: { type: "openai", name: "GPT-4o", model: "gpt-4o" },
+});
+
+const byProject = await repo.findByProjectId(project.id);
+```
+
+### CacheRepository
+
+```typescript
+const repo = new CacheRepository(db);
+
+// Cache entries are managed by CacheManager in @llmbench/core
+await repo.deleteExpired();           // clean up expired entries
+const deleted = await repo.deleteAll(); // clear entire cache
+```
+
+### EventRepository
+
+```typescript
+const repo = new EventRepository(db);
+
+// Events are persisted by EventPersister in @llmbench/core
+const events = await repo.findByRunId(runId);  // for SSE streaming
+repo.deleteStale();                             // clean up old events
+```
+
 ## Schema
 
-8 tables with proper foreign keys and cascade deletes:
+10 tables with proper foreign keys and cascade deletes:
 
 | Table | Description | Key Columns |
 |-------|-------------|-------------|
 | `projects` | Top-level project | `id`, `name`, `description` |
-| `datasets` | Test case collections | `id`, `project_id`, `name`, `version` |
-| `test_cases` | Individual test cases | `id`, `dataset_id`, `input`, `expected`, `context`, `tags` |
+| `datasets` | Test case collections | `id`, `project_id`, `name`, `version`, `content_hash` |
+| `test_cases` | Individual test cases | `id`, `dataset_id`, `input`, `expected`, `context`, `tags`, `assert` |
 | `providers` | LLM provider configs | `id`, `project_id`, `type`, `name`, `model`, `config` |
 | `eval_runs` | Evaluation runs | `id`, `project_id`, `dataset_id`, `status`, `config`, `total_cost` |
 | `eval_results` | Per-request results | `id`, `run_id`, `test_case_id`, `provider_id`, `output`, `latency_ms`, `cost` |
 | `scores` | Scorer results | `id`, `result_id`, `scorer_id`, `value`, `reason` |
 | `cost_records` | Cost tracking | `id`, `run_id`, `provider_id`, `model`, token/cost columns |
+| `cache_entries` | Response cache | `id`, `cache_key`, `model`, `input`, `output`, `expires_at`, `hits` |
+| `eval_events` | Event log for SSE streaming | `seq`, `run_id`, `event_type`, `payload`, `timestamp` |
 
 ### Cascade Rules
 

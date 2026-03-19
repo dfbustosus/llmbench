@@ -42,7 +42,7 @@ const result = await evaluate({
   ],
 });
 
-console.log(result.status);          // "completed"
+console.log(result.status);          // "completed" | "failed" | "cancelled"
 console.log(result.summary);         // { totalCases, completedCases, failedCases, totalCost, ... }
 console.log(result.scorerAverages);  // { "exact-match": 1.0, "contains": 1.0 }
 ```
@@ -64,6 +64,7 @@ console.log(result.scorerAverages);  // { "exact-match": 1.0, "contains": 1.0 }
 | `datasetName` | `string` | No | `sdk-dataset` | Dataset name |
 | `customProviders` | `Map<string, fn>` | No | -- | Custom provider functions |
 | `cache` | `{ ttlHours? }` | No | -- | Enable caching with TTL |
+| `signal` | `AbortSignal` | No | -- | Cooperative cancellation signal |
 
 **`SimpleTestCase`**:
 
@@ -413,7 +414,9 @@ The `EvaluationEngine` handles:
 
 - **Concurrency** — `ConcurrencyManager` limits parallel provider calls (configurable per run)
 - **Retries** — `RetryHandler` with exponential backoff (1s base, 30s max, configurable max retries)
-- **Events** — `EventBus` emits typed events: `run:started`, `case:started`, `case:completed`, `case:failed`, `run:progress`, `run:completed`, `run:failed`
+- **Cancellation** — Pass an `AbortSignal` to `execute()` for cooperative cancellation. In-flight tasks complete, queued tasks reject with `CancellationError`, final status is `"cancelled"`
+- **Events** — `EventBus` emits typed events: `run:started`, `case:started`, `case:completed`, `case:failed`, `run:progress`, `run:completed`, `run:failed`, `run:cancelled`
+- **Event persistence** — `EventPersister` saves events to SQLite for real-time SSE streaming to the web dashboard
 - **Per-test-case assertions** — When a test case has `assert[]`, inline scorers override global scorers. Invalid inline types (llm-judge, composite) fail fast before making API calls.
 - **Template interpolation** — `{{variable}}` substitution in prompts and system messages using test case context
 - **Caching** — SHA-256 keyed response cache with optional TTL, stored in SQLite

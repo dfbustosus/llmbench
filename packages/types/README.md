@@ -159,6 +159,7 @@ const testCase: TestCase = {
 import type { EvalRun, EvalRunConfig, EvalResult, EvalStatus } from "@llmbench/types";
 
 // EvalStatus = "pending" | "running" | "completed" | "failed" | "cancelled"
+// CancellationError — sentinel error class thrown when an AbortSignal is aborted
 
 const runConfig: EvalRunConfig = {
   providerIds: ["prov_001", "prov_002"],
@@ -180,13 +181,17 @@ const runConfig: EvalRunConfig = {
 import type { EvalEvent } from "@llmbench/types";
 
 // EvalEvent is a union of:
-//   RunStartedEvent    { type: "run:started", runId, totalCases, timestamp }
-//   CaseStartedEvent   { type: "case:started", runId, testCaseId, providerId, timestamp }
-//   CaseCompletedEvent { type: "case:completed", runId, testCaseId, providerId, latencyMs, scores, timestamp }
-//   CaseFailedEvent    { type: "case:failed", runId, testCaseId, providerId, error, timestamp }
-//   RunProgressEvent   { type: "run:progress", runId, completedCases, totalCases, failedCases, timestamp }
-//   RunCompletedEvent  { type: "run:completed", runId, totalCases, failedCases, avgScore, totalCost, timestamp }
-//   RunFailedEvent     { type: "run:failed", runId, error, timestamp }
+//   RunStartedEvent      { type: "run:started", runId, totalCases, timestamp }
+//   CaseStartedEvent     { type: "case:started", runId, testCaseId, providerId, timestamp }
+//   CaseCompletedEvent   { type: "case:completed", runId, testCaseId, providerId, latencyMs, scores, timestamp }
+//   CaseFailedEvent      { type: "case:failed", runId, testCaseId, providerId, error, timestamp }
+//   RunProgressEvent     { type: "run:progress", runId, completedCases, totalCases, failedCases, timestamp }
+//   RunCompletedEvent    { type: "run:completed", runId, totalCases, failedCases, avgScore, totalCost, timestamp }
+//   RunFailedEvent       { type: "run:failed", runId, error, timestamp }
+//   RunCancelledEvent    { type: "run:cancelled", runId, completedCases, totalCases, failedCases, timestamp }
+//   RescoreStartedEvent  { type: "rescore:started", runId, totalResults, timestamp }
+//   RescoreProgressEvent { type: "rescore:progress", runId, completedResults, totalResults, timestamp }
+//   RescoreCompletedEvent { type: "rescore:completed", runId, totalResults, scorerAverages, timestamp }
 
 function handleEvent(event: EvalEvent) {
   switch (event.type) {
