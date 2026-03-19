@@ -218,6 +218,18 @@ import { badgeVariants } from "@llmbench/ui";
 | `Badge` | Component | Multi-variant badge |
 | `badgeVariants` | CVA | Badge class generator |
 | `BadgeProps` | Type | Badge prop types |
+| `Dialog` | Component | Modal dialog root |
+| `DialogContent` | Component | Dialog content container |
+| `DialogHeader` | Component | Dialog header section |
+| `DialogTitle` | Component | Dialog title text |
+| `DialogDescription` | Component | Dialog description text |
+| `DialogFooter` | Component | Dialog footer section |
+| `ConfirmDialog` | Component | Pre-built confirmation dialog |
+| `ConfirmDialogProps` | Type | ConfirmDialog prop types |
+| `Input` | Component | Text input field |
+| `Label` | Component | Form label |
+| `Select` | Component | Select dropdown |
+| `Textarea` | Component | Multi-line text input |
 | `ScoreBadge` | Component | Auto-colored score display |
 | `CostDisplay` | Component | USD cost formatter |
 | `cn` | Utility | Tailwind class merger |

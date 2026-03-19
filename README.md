@@ -36,9 +36,10 @@ npx @llmbench/cli eval "What is the capital of France?" -p openai:gpt-4o -p anth
 
 ## Features
 
-- **Multi-provider** — Run the same prompts against OpenAI, Anthropic, Google AI, Ollama, or any custom provider. Compare side-by-side.
-- **Scoring engine** — 7 built-in scorers: exact match, contains, regex, JSON deep compare, cosine similarity, LLM-as-judge, and weighted composite.
+- **10 providers** — OpenAI, Anthropic, Google AI, Mistral, Together AI, AWS Bedrock, Azure OpenAI, Ollama, any OpenAI-compatible endpoint, or fully custom providers. Compare side-by-side.
+- **12 built-in scorers** — Exact match, contains, regex, JSON deep compare, JSON schema validation, cosine similarity, Levenshtein distance, BLEU, ROUGE, embedding similarity, LLM-as-judge, and weighted composite.
 - **Per-test-case assertions** — Override global scorers on individual test cases with inline `assert` rules. Test different criteria per prompt.
+- **Graceful cancellation** — Press Ctrl+C for cooperative cancellation that lets in-flight API calls finish. Double Ctrl+C to force quit. Cancel stuck runs from the web dashboard. Full `AbortSignal` support in the SDK.
 - **Quick eval mode** — `llmbench eval "prompt" -p openai:gpt-4o` — test a single prompt ad-hoc without creating files.
 - **TypeScript or YAML config** — Use `llmbench.config.ts` with full type safety, or `llmbench.config.yaml` for zero-build setup. Datasets support both JSON and YAML.
 - **Export & reporting** — Export any results to JSON, CSV, or self-contained HTML reports. Use `--json` for CI artifacts.
@@ -49,7 +50,7 @@ npx @llmbench/cli eval "What is the capital of France?" -p openai:gpt-4o -p anth
 - **Prompt templates** — Use `{{variable}}` interpolation in prompts and system messages with per-test-case context.
 - **Dataset versioning** — Content-hashed datasets with automatic version tracking across runs.
 - **Programmatic SDK** — One-call `evaluate()` function from `@llmbench/core` for embedding in your own tools.
-- **Web dashboard** — Next.js 15 app with charts, drill-down results, and run comparisons. Launches with `llmbench serve`.
+- **Web dashboard** — Next.js 15 app with real-time progress via SSE, charts, drill-down results, run comparisons, and full CRUD for projects, datasets, and test cases. Launches with `llmbench serve`.
 - **Local-first** — Everything stored in a single SQLite file. No cloud accounts, no external services, no data leaving your machine.
 
 ## Installation
@@ -296,7 +297,12 @@ See [@llmbench/core README](packages/core/README.md) for full SDK documentation.
 | OpenAI | `openai` | `OPENAI_API_KEY` |
 | Anthropic | `anthropic` | `ANTHROPIC_API_KEY` |
 | Google AI | `google` | `GOOGLE_AI_API_KEY` |
+| Mistral | `mistral` | `MISTRAL_API_KEY` |
+| Together AI | `together` | `TOGETHER_API_KEY` |
+| AWS Bedrock | `bedrock` | AWS credentials (env or profile) |
+| Azure OpenAI | `azure-openai` | `AZURE_OPENAI_API_KEY` |
 | Ollama | `ollama` | None (local) |
+| OpenAI-compatible | `openai-compatible` | Varies by endpoint |
 | Custom | `custom` | User-defined |
 
 API keys are read from environment variables only. They are never stored in the database or config files.
@@ -309,7 +315,12 @@ API keys are read from environment variables only. They are never stored in the 
 | Contains | `contains` | Checks if output contains the expected text |
 | Regex | `regex` | Pattern matching with configurable flags |
 | JSON Match | `json-match` | Deep JSON comparison with partial matching support |
+| JSON Schema | `json-schema` | Validates output against a JSON schema |
 | Cosine Similarity | `cosine-similarity` | Token-based vector similarity (0-1) |
+| Levenshtein | `levenshtein` | Edit-distance-based similarity (0-1) |
+| BLEU | `bleu` | Machine translation quality metric |
+| ROUGE | `rouge` | Recall-oriented summary evaluation |
+| Embedding Similarity | `embedding-similarity` | Embedding-based semantic similarity |
 | LLM Judge | `llm-judge` | Use an LLM to evaluate outputs against a custom rubric |
 | Weighted Average | `composite` | Combine multiple scorers with custom weights |
 
