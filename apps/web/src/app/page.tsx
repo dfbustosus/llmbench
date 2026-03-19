@@ -7,6 +7,8 @@ import { trpc } from "@/trpc/client";
 export default function DashboardPage() {
 	const projectsQuery = trpc.project.list.useQuery();
 	const projects = projectsQuery.data ?? [];
+	const statsQuery = trpc.project.stats.useQuery();
+	const stats = statsQuery.data;
 
 	return (
 		<div className="space-y-8">
@@ -20,19 +22,25 @@ export default function DashboardPage() {
 				<Card>
 					<CardHeader>
 						<CardDescription>Total Projects</CardDescription>
-						<CardTitle className="text-3xl">{projects.length}</CardTitle>
-					</CardHeader>
-				</Card>
-				<Card>
-					<CardHeader>
-						<CardDescription>Active Projects</CardDescription>
-						<CardTitle className="text-3xl">{projects.length}</CardTitle>
+						<CardTitle className={`text-3xl ${statsQuery.isError ? "text-red-500" : ""}`}>
+							{statsQuery.isLoading ? "-" : statsQuery.isError ? "!" : (stats?.totalProjects ?? 0)}
+						</CardTitle>
 					</CardHeader>
 				</Card>
 				<Card>
 					<CardHeader>
 						<CardDescription>Total Evaluations</CardDescription>
-						<CardTitle className="text-3xl">-</CardTitle>
+						<CardTitle className={`text-3xl ${statsQuery.isError ? "text-red-500" : ""}`}>
+							{statsQuery.isLoading ? "-" : statsQuery.isError ? "!" : (stats?.totalRuns ?? 0)}
+						</CardTitle>
+					</CardHeader>
+				</Card>
+				<Card>
+					<CardHeader>
+						<CardDescription>Active Runs</CardDescription>
+						<CardTitle className={`text-3xl ${statsQuery.isError ? "text-red-500" : ""}`}>
+							{statsQuery.isLoading ? "-" : statsQuery.isError ? "!" : (stats?.activeRuns ?? 0)}
+						</CardTitle>
 					</CardHeader>
 				</Card>
 			</div>
@@ -75,7 +83,7 @@ export default function DashboardPage() {
 						<CardDescription>Latest evaluation runs across all projects</CardDescription>
 					</CardHeader>
 					<CardContent>
-						<RecentRunsTable projectId={projects[0]?.id} />
+						<RecentRunsTable />
 					</CardContent>
 				</Card>
 			)}
