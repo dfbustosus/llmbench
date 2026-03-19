@@ -64,8 +64,17 @@ export class EvalResultRepository {
 		};
 	}
 
-	async findByRunId(runId: string): Promise<EvalResult[]> {
-		const rows = this.db.select().from(evalResults).where(eq(evalResults.runId, runId)).all();
+	async findByRunId(
+		runId: string,
+		options?: { limit?: number; offset?: number },
+	): Promise<EvalResult[]> {
+		const rows = this.db
+			.select()
+			.from(evalResults)
+			.where(eq(evalResults.runId, runId))
+			.limit(options?.limit ?? 10000)
+			.offset(options?.offset ?? 0)
+			.all();
 		return rows.map(this.toEvalResult);
 	}
 
