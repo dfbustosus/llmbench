@@ -2,14 +2,17 @@
 
 import {
 	Badge,
+	Button,
 	Card,
 	CardContent,
 	CardDescription,
 	CardHeader,
 	CardTitle,
+	ConfirmDialog,
 	CostDisplay,
 } from "@llmbench/ui";
-import { use, useEffect, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import { LatencyChart } from "@/components/charts/latency-chart";
 import { ScoreDistributionChart } from "@/components/charts/score-distribution-chart";
 import { useRunEvents } from "@/hooks/use-run-events";
@@ -21,6 +24,16 @@ export default function RunDetailPage({
 	params: Promise<{ projectId: string; runId: string }>;
 }) {
 	const { projectId, runId } = use(params);
+	const router = useRouter();
+	const [deleteOpen, setDeleteOpen] = useState(false);
+	const [deleteError, setDeleteError] = useState<string | null>(null);
+
+	const deleteMutation = trpc.evalRun.delete.useMutation({
+		onSuccess: () => {
+			router.push(`/projects/${projectId}/runs`);
+		},
+		onError: (err) => setDeleteError(err.message),
+	});
 
 	const runQuery = trpc.evalRun.getById.useQuery(runId);
 	const resultsQuery = trpc.evalRun.getResults.useQuery(runId);
@@ -119,6 +132,9 @@ export default function RunDetailPage({
 				>
 					{run.status}
 				</Badge>
+				<Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
+					Delete Run
+				</Button>
 				{eventState.isLive && (
 					<span className="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 dark:text-green-400">
 						<span className="relative flex h-2 w-2">
@@ -309,6 +325,19 @@ export default function RunDetailPage({
 					</div>
 				</CardContent>
 			</Card>
+
+			<ConfirmDialog
+				open={deleteOpen}
+				onOpenChange={(open) => {
+					setDeleteOpen(open);
+					if (!open) setDeleteError(null);
+				}}
+				title="Delete Run"
+				description="This will permanently delete this evaluation run and all its results and scores."
+				onConfirm={() => deleteMutation.mutate(runId)}
+				loading={deleteMutation.isPending}
+				error={deleteError}
+			/>
 		</div>
 	);
 }
