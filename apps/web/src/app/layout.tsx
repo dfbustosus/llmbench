@@ -30,6 +30,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 											<a href="/projects" className="hover:text-foreground transition-colors">
 												Projects
 											</a>
+											<a href="/compare" className="hover:text-foreground transition-colors">
+												Compare
+											</a>
 										</div>
 									</div>
 								</div>
