@@ -1,5 +1,5 @@
 import type { ChatMessage, TestCase, TestCaseAssertion } from "@llmbench/types";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { LLMBenchDB } from "../client.js";
 import { testCases } from "../schema/index.js";
@@ -56,17 +56,55 @@ export class TestCaseRepository {
 			orderIndex?: number;
 		}>,
 	): Promise<TestCase[]> {
-		const results: TestCase[] = [];
-		for (let i = 0; i < items.length; i++) {
-			const item = items[i];
-			const tc = await this.create({ ...item, orderIndex: item.orderIndex ?? i });
-			results.push(tc);
+		if (items.length === 0) return [];
+
+		const records = items.map((item, i) => ({
+			id: nanoid(),
+			datasetId: item.datasetId,
+			input: item.input,
+			expected: item.expected,
+			messages: item.messages ? JSON.stringify(item.messages) : null,
+			context: item.context ? JSON.stringify(item.context) : null,
+			tags: item.tags ? JSON.stringify(item.tags) : null,
+			assert: item.assert ? JSON.stringify(item.assert) : null,
+			orderIndex: item.orderIndex ?? i,
+		}));
+
+		// SQLite has a ~32766 bind variable limit. With 10 columns per row,
+		// insert in chunks of 500 to stay well under the limit.
+		const CHUNK_SIZE = 500;
+		for (let i = 0; i < records.length; i += CHUNK_SIZE) {
+			this.db
+				.insert(testCases)
+				.values(records.slice(i, i + CHUNK_SIZE))
+				.run();
 		}
-		return results;
+
+		return records.map((r, i) => ({
+			id: r.id,
+			datasetId: r.datasetId,
+			input: r.input,
+			expected: r.expected,
+			messages: items[i].messages,
+			context: items[i].context,
+			tags: items[i].tags,
+			assert: items[i].assert,
+			orderIndex: r.orderIndex,
+		}));
 	}
 
-	async findByDatasetId(datasetId: string): Promise<TestCase[]> {
-		const rows = this.db.select().from(testCases).where(eq(testCases.datasetId, datasetId)).all();
+	async findByDatasetId(
+		datasetId: string,
+		options?: { limit?: number; offset?: number },
+	): Promise<TestCase[]> {
+		const rows = this.db
+			.select()
+			.from(testCases)
+			.where(eq(testCases.datasetId, datasetId))
+			.orderBy(asc(testCases.orderIndex))
+			.limit(options?.limit ?? 10000)
+			.offset(options?.offset ?? 0)
+			.all();
 		return rows.map(this.toTestCase);
 	}
 

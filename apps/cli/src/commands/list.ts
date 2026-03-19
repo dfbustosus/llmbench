@@ -32,7 +32,7 @@ export const listCommand = new Command("list")
 			for (const project of filteredProjects) {
 				console.log(chalk.bold(`\nProject: ${project.name}`));
 
-				const runs = await runRepo.findByProjectId(project.id, Number(options.limit));
+				const runs = await runRepo.findByProjectId(project.id, { limit: Number(options.limit) });
 
 				if (runs.length === 0) {
 					console.log(chalk.dim("  No runs yet"));

@@ -1,5 +1,5 @@
 import type { EvalRun, EvalRunConfig, EvalStatus } from "@llmbench/types";
-import { desc, eq } from "drizzle-orm";
+import { count, desc, eq, or } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { LLMBenchDB } from "../client.js";
 import { evalRuns } from "../schema/index.js";
@@ -48,13 +48,17 @@ export class EvalRunRepository {
 		return this.toEvalRun(row);
 	}
 
-	async findByProjectId(projectId: string, limit = 50): Promise<EvalRun[]> {
+	async findByProjectId(
+		projectId: string,
+		options?: { limit?: number; offset?: number },
+	): Promise<EvalRun[]> {
 		const rows = this.db
 			.select()
 			.from(evalRuns)
 			.where(eq(evalRuns.projectId, projectId))
 			.orderBy(desc(evalRuns.createdAt))
-			.limit(limit)
+			.limit(options?.limit ?? 50)
+			.offset(options?.offset ?? 0)
 			.all();
 		return rows.map(this.toEvalRun);
 	}
@@ -93,6 +97,29 @@ export class EvalRunRepository {
 			.set({ config: JSON.stringify(config), updatedAt: now })
 			.where(eq(evalRuns.id, id))
 			.run();
+	}
+
+	async countAll(): Promise<{ total: number; active: number }> {
+		const totalRow = this.db.select({ count: count() }).from(evalRuns).get();
+		const activeRow = this.db
+			.select({ count: count() })
+			.from(evalRuns)
+			.where(or(eq(evalRuns.status, "running"), eq(evalRuns.status, "pending")))
+			.get();
+		return {
+			total: totalRow?.count ?? 0,
+			active: activeRow?.count ?? 0,
+		};
+	}
+
+	async findRecent(limit = 10): Promise<EvalRun[]> {
+		const rows = this.db
+			.select()
+			.from(evalRuns)
+			.orderBy(desc(evalRuns.createdAt))
+			.limit(limit)
+			.all();
+		return rows.map(this.toEvalRun);
 	}
 
 	async delete(id: string): Promise<boolean> {

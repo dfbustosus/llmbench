@@ -40,7 +40,10 @@ export const testCases = sqliteTable(
 		assert: text("assert"), // JSON - TestCaseAssertion[]
 		orderIndex: integer("order_index").notNull().default(0),
 	},
-	(table) => [index("idx_test_cases_dataset_id").on(table.datasetId)],
+	(table) => [
+		index("idx_test_cases_dataset_id").on(table.datasetId),
+		index("idx_test_cases_dataset_order").on(table.datasetId, table.orderIndex),
+	],
 );
 
 export const providers = sqliteTable(
@@ -69,7 +72,7 @@ export const evalRuns = sqliteTable(
 			.references(() => projects.id, { onDelete: "cascade" }),
 		datasetId: text("dataset_id")
 			.notNull()
-			.references(() => datasets.id),
+			.references(() => datasets.id, { onDelete: "cascade" }),
 		status: text("status").notNull().default("pending"), // EvalStatus
 		config: text("config"), // JSON - EvalRunConfig
 		totalCases: integer("total_cases").notNull().default(0),
@@ -99,10 +102,10 @@ export const evalResults = sqliteTable(
 			.references(() => evalRuns.id, { onDelete: "cascade" }),
 		testCaseId: text("test_case_id")
 			.notNull()
-			.references(() => testCases.id),
+			.references(() => testCases.id, { onDelete: "cascade" }),
 		providerId: text("provider_id")
 			.notNull()
-			.references(() => providers.id),
+			.references(() => providers.id, { onDelete: "cascade" }),
 		input: text("input").notNull(),
 		output: text("output").notNull(),
 		expected: text("expected").notNull(),
@@ -118,6 +121,8 @@ export const evalResults = sqliteTable(
 	(table) => [
 		index("idx_eval_results_run_id").on(table.runId),
 		index("idx_eval_results_run_provider").on(table.runId, table.providerId),
+		index("idx_eval_results_test_case_id").on(table.testCaseId),
+		uniqueIndex("idx_eval_results_unique").on(table.runId, table.testCaseId, table.providerId),
 	],
 );
 
@@ -136,7 +141,12 @@ export const scores = sqliteTable(
 		reason: text("reason"),
 		metadata: text("metadata"), // JSON
 	},
-	(table) => [index("idx_scores_result_id").on(table.resultId)],
+	(table) => [
+		index("idx_scores_result_id").on(table.resultId),
+		index("idx_scores_scorer_id").on(table.scorerId),
+		index("idx_scores_scorer_name").on(table.scorerName),
+		uniqueIndex("idx_scores_result_scorer").on(table.resultId, table.scorerId),
+	],
 );
 
 export const cacheEntries = sqliteTable(
@@ -153,7 +163,10 @@ export const cacheEntries = sqliteTable(
 		expiresAt: text("expires_at"),
 		hits: integer("hits").notNull().default(0),
 	},
-	(table) => [uniqueIndex("idx_cache_entries_key").on(table.cacheKey)],
+	(table) => [
+		uniqueIndex("idx_cache_entries_key").on(table.cacheKey),
+		index("idx_cache_entries_expires_at").on(table.expiresAt),
+	],
 );
 
 export const costRecords = sqliteTable(
@@ -165,7 +178,7 @@ export const costRecords = sqliteTable(
 			.references(() => evalRuns.id, { onDelete: "cascade" }),
 		providerId: text("provider_id")
 			.notNull()
-			.references(() => providers.id),
+			.references(() => providers.id, { onDelete: "cascade" }),
 		model: text("model").notNull(),
 		inputTokens: integer("input_tokens").notNull().default(0),
 		outputTokens: integer("output_tokens").notNull().default(0),
@@ -175,14 +188,19 @@ export const costRecords = sqliteTable(
 		totalCost: real("total_cost").notNull().default(0),
 		createdAt: text("created_at").notNull(),
 	},
-	(table) => [index("idx_cost_records_run_id").on(table.runId)],
+	(table) => [
+		index("idx_cost_records_run_id").on(table.runId),
+		index("idx_cost_records_provider_id").on(table.providerId),
+	],
 );
 
 export const evalEvents = sqliteTable(
 	"eval_events",
 	{
 		seq: integer("seq").primaryKey({ autoIncrement: true }),
-		runId: text("run_id").notNull(),
+		runId: text("run_id")
+			.notNull()
+			.references(() => evalRuns.id, { onDelete: "cascade" }),
 		eventType: text("event_type").notNull(),
 		payload: text("payload").notNull(),
 		timestamp: text("timestamp").notNull(),

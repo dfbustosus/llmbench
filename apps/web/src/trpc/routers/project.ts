@@ -32,4 +32,15 @@ export const projectRouter = router({
 	delete: publicProcedure.input(z.string()).mutation(async ({ input }) => {
 		return getRepos().project.delete(input);
 	}),
+
+	stats: publicProcedure.query(async () => {
+		const repos = getRepos();
+		const totalProjects = await repos.project.countAll();
+		const runCounts = await repos.evalRun.countAll();
+		return {
+			totalProjects,
+			totalRuns: runCounts.total,
+			activeRuns: runCounts.active,
+		};
+	}),
 });

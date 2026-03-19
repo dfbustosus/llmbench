@@ -41,8 +41,17 @@ export class DatasetRepository {
 		return this.toDataset(row);
 	}
 
-	async findByProjectId(projectId: string): Promise<Dataset[]> {
-		const rows = this.db.select().from(datasets).where(eq(datasets.projectId, projectId)).all();
+	async findByProjectId(
+		projectId: string,
+		options?: { limit?: number; offset?: number },
+	): Promise<Dataset[]> {
+		const rows = this.db
+			.select()
+			.from(datasets)
+			.where(eq(datasets.projectId, projectId))
+			.limit(options?.limit ?? 1000)
+			.offset(options?.offset ?? 0)
+			.all();
 		return rows.map(this.toDataset);
 	}
 

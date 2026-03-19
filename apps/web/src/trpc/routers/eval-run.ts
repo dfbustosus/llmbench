@@ -5,7 +5,7 @@ export const evalRunRouter = router({
 	listByProject: publicProcedure
 		.input(z.object({ projectId: z.string(), limit: z.number().optional() }))
 		.query(async ({ input }) => {
-			return getRepos().evalRun.findByProjectId(input.projectId, input.limit);
+			return getRepos().evalRun.findByProjectId(input.projectId, { limit: input.limit });
 		}),
 
 	getById: publicProcedure.input(z.string()).query(async ({ input }) => {
@@ -16,20 +16,12 @@ export const evalRunRouter = router({
 		return getRepos().evalResult.findByRunId(input);
 	}),
 
-	getScores: publicProcedure.input(z.string()).query(async ({ input }) => {
-		return getRepos().score.findByResultId(input);
-	}),
-
 	getScoresByRunId: publicProcedure.input(z.string()).query(async ({ input }) => {
 		return getRepos().score.findByRunId(input);
 	}),
 
 	getProvidersByProject: publicProcedure.input(z.string()).query(async ({ input }) => {
 		return getRepos().provider.findByProjectId(input);
-	}),
-
-	getCostRecords: publicProcedure.input(z.string()).query(async ({ input }) => {
-		return getRepos().costRecord.findByRunId(input);
 	}),
 
 	cancel: publicProcedure.input(z.string()).mutation(async ({ input }) => {
@@ -43,6 +35,12 @@ export const evalRunRouter = router({
 		await getRepos().evalRun.updateStatus(input, "cancelled");
 		return true;
 	}),
+
+	recent: publicProcedure
+		.input(z.object({ limit: z.number().optional() }).optional())
+		.query(async ({ input }) => {
+			return getRepos().evalRun.findRecent(input?.limit ?? 10);
+		}),
 
 	delete: publicProcedure.input(z.string()).mutation(async ({ input }) => {
 		return getRepos().evalRun.delete(input);

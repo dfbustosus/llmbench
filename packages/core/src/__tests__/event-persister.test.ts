@@ -1,12 +1,37 @@
-import { createInMemoryDB, EventRepository, initializeDB } from "@llmbench/db";
+import {
+	createInMemoryDB,
+	DatasetRepository,
+	EvalRunRepository,
+	EventRepository,
+	initializeDB,
+	type LLMBenchDB,
+	ProjectRepository,
+} from "@llmbench/db";
 import type { EvalEvent } from "@llmbench/types";
 import { describe, expect, it, vi } from "vitest";
 import { EventPersister } from "../engine/event-persister.js";
 
+/** Helper: create parent records so eval_events FK is satisfied, then rename run id */
+async function createEvalRun(db: LLMBenchDB, runId: string) {
+	const project = await new ProjectRepository(db).create({ name: `proj-${runId}` });
+	const dataset = await new DatasetRepository(db).create({
+		projectId: project.id,
+		name: `ds-${runId}`,
+	});
+	const run = await new EvalRunRepository(db).create({
+		projectId: project.id,
+		datasetId: dataset.id,
+		config: { providerIds: [], scorerConfigs: [], concurrency: 1, maxRetries: 0, timeoutMs: 30000 },
+		totalCases: 0,
+	});
+	db.run(`UPDATE eval_runs SET id = '${runId}' WHERE id = '${run.id}'`);
+}
+
 describe("EventPersister", () => {
-	it("should persist events to the repository", () => {
+	it("should persist events to the repository", async () => {
 		const db = createInMemoryDB();
 		initializeDB(db);
+		await createEvalRun(db, "run-123");
 		const repo = new EventRepository(db);
 		const persister = new EventPersister(repo);
 		const handler = persister.handler();
@@ -53,9 +78,10 @@ describe("EventPersister", () => {
 		expect(() => handler(event)).not.toThrow();
 	});
 
-	it("should cleanup events by runId", () => {
+	it("should cleanup events by runId", async () => {
 		const db = createInMemoryDB();
 		initializeDB(db);
+		await createEvalRun(db, "run-cleanup");
 		const repo = new EventRepository(db);
 		const persister = new EventPersister(repo);
 		const handler = persister.handler();
