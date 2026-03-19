@@ -1,5 +1,5 @@
 import type { Project } from "@llmbench/types";
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { LLMBenchDB } from "../client.js";
 import { projects } from "../schema/index.js";
@@ -37,8 +37,13 @@ export class ProjectRepository {
 		};
 	}
 
-	async findAll(): Promise<Project[]> {
-		const rows = this.db.select().from(projects).all();
+	async findAll(options?: { limit?: number; offset?: number }): Promise<Project[]> {
+		const rows = this.db
+			.select()
+			.from(projects)
+			.limit(options?.limit ?? 1000)
+			.offset(options?.offset ?? 0)
+			.all();
 		return rows.map((row) => ({
 			...row,
 			description: row.description ?? undefined,
@@ -54,6 +59,11 @@ export class ProjectRepository {
 			.run();
 
 		return this.findById(id);
+	}
+
+	async countAll(): Promise<number> {
+		const row = this.db.select({ count: count() }).from(projects).get();
+		return row?.count ?? 0;
 	}
 
 	async delete(id: string): Promise<boolean> {
