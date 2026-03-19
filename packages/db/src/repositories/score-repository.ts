@@ -26,8 +26,28 @@ export class ScoreRepository {
 	}
 
 	async createMany(resultId: string, scoreResults: ScoreResult[]): Promise<void> {
-		for (const sr of scoreResults) {
-			await this.create(resultId, sr);
+		if (scoreResults.length === 0) return;
+
+		const records = scoreResults.map((sr) => ({
+			id: nanoid(),
+			resultId,
+			scorerId: sr.scorerId,
+			scorerName: sr.scorerName,
+			scorerType: sr.scorerType,
+			value: sr.value,
+			rawValue: sr.rawValue ?? null,
+			reason: sr.reason ?? null,
+			metadata: sr.metadata ? JSON.stringify(sr.metadata) : null,
+		}));
+
+		// SQLite has a ~32766 bind variable limit. With 9 columns per row,
+		// insert in chunks of 500 to stay well under the limit.
+		const CHUNK_SIZE = 500;
+		for (let i = 0; i < records.length; i += CHUNK_SIZE) {
+			this.db
+				.insert(scores)
+				.values(records.slice(i, i + CHUNK_SIZE))
+				.run();
 		}
 	}
 
