@@ -4,16 +4,17 @@ import type {
 	EvalRunRepository,
 	ScoreRepository,
 } from "@llmbench/db";
-import type {
-	ChatMessage,
-	EvalEvent,
-	EvalRun,
-	IProvider,
-	IScorer,
-	ProviderConfig,
-	ProviderResponse,
-	ScoreResult,
-	TestCase,
+import {
+	CancellationError,
+	type ChatMessage,
+	type EvalEvent,
+	type EvalRun,
+	type IProvider,
+	type IScorer,
+	type ProviderConfig,
+	type ProviderResponse,
+	type ScoreResult,
+	type TestCase,
 } from "@llmbench/types";
 import type { CostCalculator } from "../cost/cost-calculator.js";
 import type { CacheManager } from "./cache-manager.js";
@@ -65,7 +66,7 @@ export class EvaluationEngine {
 		return this.eventBus.on(handler);
 	}
 
-	async execute(run: EvalRun, testCases: TestCase[]): Promise<void> {
+	async execute(run: EvalRun, testCases: TestCase[], signal?: AbortSignal): Promise<void> {
 		const config = run.config;
 		const concurrency = new ConcurrencyManager(config.concurrency);
 		const retry = new RetryHandler(config.maxRetries);
@@ -91,6 +92,10 @@ export class EvaluationEngine {
 
 		for (const testCase of testCases) {
 			for (const providerId of config.providerIds) {
+				if (signal?.aborted) {
+					continue;
+				}
+
 				const provider = this.providers.get(providerId);
 				if (!provider) {
 					failedCases++;
@@ -106,6 +111,9 @@ export class EvaluationEngine {
 				}
 
 				const task = concurrency.run(async () => {
+					if (signal?.aborted) {
+						throw new CancellationError();
+					}
 					this.eventBus.emit({
 						type: "case:started",
 						runId: run.id,
@@ -167,8 +175,9 @@ export class EvaluationEngine {
 								cached = true;
 								this.cacheHits++;
 							} else {
-								response = await retry.execute(() =>
-									provider.generate(providerInput, configOverrides),
+								response = await retry.execute(
+									() => provider.generate(providerInput, configOverrides),
+									signal,
 								);
 								if (response.error) {
 									throw new Error(response.error);
@@ -182,8 +191,9 @@ export class EvaluationEngine {
 								);
 							}
 						} else {
-							response = await retry.execute(() =>
-								provider.generate(providerInput, configOverrides),
+							response = await retry.execute(
+								() => provider.generate(providerInput, configOverrides),
+								signal,
 							);
 							if (response.error) {
 								throw new Error(response.error);
@@ -255,6 +265,10 @@ export class EvaluationEngine {
 							timestamp: new Date().toISOString(),
 						});
 					} catch (error) {
+						if (error instanceof CancellationError) {
+							return;
+						}
+
 						failedCases++;
 
 						// Save failed result
@@ -302,18 +316,31 @@ export class EvaluationEngine {
 						totalTokens,
 						avgLatencyMs: currentCompleted > 0 ? totalLatency / currentCompleted : undefined,
 					});
-				});
+				}, signal);
 
 				tasks.push(task);
 			}
 		}
 
-		await Promise.all(tasks);
+		await Promise.allSettled(tasks);
 
-		const finalStatus: "completed" | "failed" = failedCases === totalCount ? "failed" : "completed";
+		const finalStatus: "completed" | "failed" | "cancelled" = signal?.aborted
+			? "cancelled"
+			: failedCases === totalCount
+				? "failed"
+				: "completed";
 		await this.evalRunRepo.updateStatus(run.id, finalStatus);
 
-		if (finalStatus === "completed") {
+		if (finalStatus === "cancelled") {
+			this.eventBus.emit({
+				type: "run:cancelled",
+				runId: run.id,
+				completedCases,
+				totalCases: totalCount,
+				failedCases,
+				timestamp: new Date().toISOString(),
+			});
+		} else if (finalStatus === "completed") {
 			this.eventBus.emit({
 				type: "run:completed",
 				runId: run.id,

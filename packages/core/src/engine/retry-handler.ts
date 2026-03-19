@@ -1,3 +1,5 @@
+import { CancellationError } from "@llmbench/types";
+
 export class RetryHandler {
 	private maxDelayMs: number;
 
@@ -9,10 +11,14 @@ export class RetryHandler {
 		this.maxDelayMs = maxDelayMs;
 	}
 
-	async execute<T>(fn: () => Promise<T>): Promise<T> {
+	async execute<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
 		let lastError: Error | undefined;
 
 		for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+			if (signal?.aborted) {
+				throw new CancellationError();
+			}
+
 			try {
 				return await fn();
 			} catch (error) {
@@ -20,11 +26,31 @@ export class RetryHandler {
 
 				if (attempt < this.maxRetries) {
 					const delay = Math.min(this.baseDelayMs * 2 ** attempt, this.maxDelayMs);
-					await new Promise((resolve) => setTimeout(resolve, delay));
+					await this.abortableDelay(delay, signal);
 				}
 			}
 		}
 
 		throw lastError;
+	}
+
+	private abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+		if (signal?.aborted) {
+			return Promise.reject(new CancellationError());
+		}
+
+		return new Promise<void>((resolve, reject) => {
+			const onAbort = () => {
+				clearTimeout(timer);
+				reject(new CancellationError());
+			};
+
+			const timer = setTimeout(() => {
+				signal?.removeEventListener("abort", onAbort);
+				resolve();
+			}, ms);
+
+			signal?.addEventListener("abort", onAbort, { once: true });
+		});
 	}
 }
