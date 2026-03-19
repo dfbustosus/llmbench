@@ -62,7 +62,7 @@ export class EvalRunRepository {
 	async updateStatus(id: string, status: EvalStatus): Promise<void> {
 		const now = new Date().toISOString();
 		const updates: Record<string, unknown> = { status, updatedAt: now };
-		if (status === "completed" || status === "failed") {
+		if (status === "completed" || status === "failed" || status === "cancelled") {
 			updates.completedAt = now;
 		}
 		this.db.update(evalRuns).set(updates).where(eq(evalRuns.id, id)).run();
