@@ -32,6 +32,18 @@ export const evalRunRouter = router({
 		return getRepos().costRecord.findByRunId(input);
 	}),
 
+	cancel: publicProcedure.input(z.string()).mutation(async ({ input }) => {
+		const run = await getRepos().evalRun.findById(input);
+		if (!run) {
+			throw new Error("Run not found");
+		}
+		if (run.status !== "running" && run.status !== "pending") {
+			throw new Error(`Cannot cancel run with status "${run.status}"`);
+		}
+		await getRepos().evalRun.updateStatus(input, "cancelled");
+		return true;
+	}),
+
 	delete: publicProcedure.input(z.string()).mutation(async ({ input }) => {
 		return getRepos().evalRun.delete(input);
 	}),

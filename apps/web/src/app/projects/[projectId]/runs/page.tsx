@@ -11,6 +11,8 @@ function statusVariant(status: string) {
 			return "success" as const;
 		case "failed":
 			return "destructive" as const;
+		case "cancelled":
+			return "warning" as const;
 		case "running":
 			return "default" as const;
 		default:

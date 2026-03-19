@@ -69,6 +69,8 @@ export interface EvaluateOptions {
 	customProviders?: Map<string, CustomGenerateFn>;
 	/** Enable response caching. Only effective with a persistent DB. */
 	cache?: { ttlHours?: number };
+	/** AbortSignal for cooperative cancellation. */
+	signal?: AbortSignal;
 }
 
 /** Quick eval options — single prompt. */
@@ -87,6 +89,8 @@ export interface EvaluateQuickOptions {
 	datasetName?: string;
 	customProviders?: Map<string, CustomGenerateFn>;
 	cache?: { ttlHours?: number };
+	/** AbortSignal for cooperative cancellation. */
+	signal?: AbortSignal;
 }
 
 /** Result with scores paired together. */
@@ -108,7 +112,7 @@ export interface EvaluateSummary {
 
 /** Return value from evaluate(). */
 export interface EvaluateResult {
-	status: "completed" | "failed";
+	status: "completed" | "failed" | "cancelled";
 	run: EvalRun;
 	results: ResultWithScores[];
 	scoresByResultId: Record<string, ScoreResult[]>;
@@ -267,7 +271,7 @@ export async function evaluate(options: EvaluateOptions): Promise<EvaluateResult
 	}
 
 	// 12. Execute
-	await engine.execute(run, testCases);
+	await engine.execute(run, testCases, options.signal);
 
 	// 13. Query results (single batch query — no N+1)
 	const finalRun = await evalRunRepo.findById(run.id);
@@ -287,8 +291,12 @@ export async function evaluate(options: EvaluateOptions): Promise<EvaluateResult
 	const durationMs = Math.round(performance.now() - startTime);
 	const scorerAverages = computeScorerAverages(scoresByResultId);
 
-	const status: "completed" | "failed" =
-		finalRun.status === "completed" || finalRun.status === "failed" ? finalRun.status : "failed";
+	const status: "completed" | "failed" | "cancelled" =
+		finalRun.status === "completed" ||
+		finalRun.status === "failed" ||
+		finalRun.status === "cancelled"
+			? finalRun.status
+			: "failed";
 
 	const summary: EvaluateSummary = {
 		totalCases: finalRun.totalCases,
@@ -339,5 +347,6 @@ export async function evaluateQuick(options: EvaluateQuickOptions): Promise<Eval
 		datasetName: options.datasetName,
 		customProviders: options.customProviders,
 		cache: options.cache,
+		signal: options.signal,
 	});
 }

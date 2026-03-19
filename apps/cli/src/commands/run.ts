@@ -319,9 +319,35 @@ export const runCommand = new Command("run")
 				}
 			});
 
+			// Set up cancellation
+			const controller = new AbortController();
+			let cancelRequested = false;
+
+			const onSignal = () => {
+				if (cancelRequested) {
+					process.exit(130);
+				}
+				cancelRequested = true;
+				controller.abort();
+				if (spinner) spinner.text = "Cancelling... (press Ctrl+C again to force quit)";
+			};
+
+			process.on("SIGINT", onSignal);
+			process.on("SIGTERM", onSignal);
+
 			// Execute
-			await engine.execute(run, testCases);
-			if (spinner) spinner.succeed("Evaluation complete!");
+			try {
+				await engine.execute(run, testCases, controller.signal);
+			} finally {
+				process.removeListener("SIGINT", onSignal);
+				process.removeListener("SIGTERM", onSignal);
+			}
+
+			if (cancelRequested) {
+				if (spinner) spinner.warn("Evaluation cancelled");
+			} else {
+				if (spinner) spinner.succeed("Evaluation complete!");
+			}
 
 			// Collect results and scores (single batch query)
 			const results = await evalResultRepo.findByRunId(run.id);
@@ -360,7 +386,13 @@ export const runCommand = new Command("run")
 
 				console.log();
 				console.log(chalk.bold("Summary:"));
-				console.log(`  Status: ${chalk.green(finalRun?.status)}`);
+				const statusColor =
+					finalRun?.status === "cancelled"
+						? chalk.yellow
+						: finalRun?.status === "failed"
+							? chalk.red
+							: chalk.green;
+				console.log(`  Status: ${statusColor(finalRun?.status)}`);
 				console.log(`  Total cases: ${finalRun?.totalCases}`);
 				console.log(`  Completed: ${finalRun?.completedCases}`);
 				console.log(`  Failed: ${finalRun?.failedCases}`);
