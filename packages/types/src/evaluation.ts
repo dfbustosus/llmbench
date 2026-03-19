@@ -2,6 +2,13 @@ import type { ScorerConfig } from "./scoring.js";
 
 export type EvalStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 
+export class CancellationError extends Error {
+	constructor(message = "Operation cancelled") {
+		super(message);
+		this.name = "CancellationError";
+	}
+}
+
 export interface EvalRun {
 	id: string;
 	projectId: string;

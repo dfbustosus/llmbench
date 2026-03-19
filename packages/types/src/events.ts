@@ -6,6 +6,7 @@ export type EvalEvent =
 	| RunProgressEvent
 	| RunCompletedEvent
 	| RunFailedEvent
+	| RunCancelledEvent
 	| RescoreStartedEvent
 	| RescoreProgressEvent
 	| RescoreCompletedEvent;
@@ -68,6 +69,15 @@ export interface RunFailedEvent {
 	type: "run:failed";
 	runId: string;
 	error: string;
+	timestamp: string;
+}
+
+export interface RunCancelledEvent {
+	type: "run:cancelled";
+	runId: string;
+	completedCases: number;
+	totalCases: number;
+	failedCases: number;
 	timestamp: string;
 }
 
