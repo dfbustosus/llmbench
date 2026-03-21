@@ -350,13 +350,15 @@ async function runWithSave(
 		});
 	}
 
-	// Create inline dataset with single test case
+	// Create inline dataset with auto-versioning to avoid unique constraint conflicts
 	if (spinner) spinner.text = "Setting up evaluation...";
+	const existingVersions = await datasetRepo.findByNameInProject(project.id, "ad-hoc");
+	const nextVersion = existingVersions.length > 0 ? existingVersions[0].version + 1 : 1;
 	const dataset = await datasetRepo.create({
 		projectId: project.id,
 		name: "ad-hoc",
 		description: "Inline eval prompt",
-		version: 1,
+		version: nextVersion,
 	});
 
 	await testCaseRepo.createMany([
@@ -376,9 +378,7 @@ async function runWithSave(
 	const providerIdToConfig = new Map<string, ProviderConfig>();
 
 	for (const pc of providerConfigs) {
-		let providerRecord = (await providerRepo.findByProjectId(project.id)).find(
-			(p) => p.name === pc.name && p.model === pc.model,
-		);
+		let providerRecord = await providerRepo.findByProjectAndName(project.id, pc.name);
 		if (!providerRecord) {
 			providerRecord = await providerRepo.create({
 				projectId: project.id,
