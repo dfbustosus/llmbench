@@ -45,8 +45,8 @@ npm install -g @llmbench/cli
 
 ## Features
 
-- **Multi-provider** — Run the same prompts against OpenAI, Anthropic, Google AI, Ollama, or any custom provider.
-- **7 built-in scorers** — Exact match, contains, regex, JSON deep compare, cosine similarity, LLM-as-judge, weighted composite.
+- **9 providers** — OpenAI, Anthropic, Google AI, Mistral, Together AI, AWS Bedrock, Azure OpenAI, Ollama, or fully custom providers. Compare side-by-side.
+- **12 built-in scorers** — Exact match, contains, regex, JSON deep compare, JSON schema validation, cosine similarity, Levenshtein distance, BLEU, ROUGE, embedding similarity, LLM-as-judge, weighted composite.
 - **Per-test-case assertions** — Override global scorers per test case with inline `assert` rules and custom expected values.
 - **Quick eval mode** — Test a single prompt ad-hoc: `llmbench eval "prompt" -p openai:gpt-4o`.
 - **YAML or TypeScript config** — Use `llmbench.config.yaml` or `llmbench.config.ts`. Datasets support both JSON and YAML.
@@ -409,9 +409,13 @@ Supported inline types: `exact-match`, `contains`, `regex`, `json-match`, `cosin
 
 | Provider | Config `type` | Environment Variable | Example Models |
 |----------|--------------|---------------------|--------|
-| OpenAI | `openai` | `OPENAI_API_KEY` | gpt-4o, gpt-4o-mini, gpt-5, o3, o4-mini |
+| OpenAI | `openai` | `OPENAI_API_KEY` | gpt-4o, gpt-4o-mini, o3, o4-mini |
 | Anthropic | `anthropic` | `ANTHROPIC_API_KEY` | claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5-20251001 |
 | Google AI | `google` | `GOOGLE_AI_API_KEY` | gemini-2.5-pro, gemini-2.0-flash, gemini-1.5-pro |
+| Mistral | `mistral` | `MISTRAL_API_KEY` | mistral-large-latest, mistral-medium, mistral-small |
+| Together AI | `together` | `TOGETHER_API_KEY` | meta-llama/Llama-3-70b, mistralai/Mixtral-8x7B |
+| AWS Bedrock | `bedrock` | AWS credentials | anthropic.claude-v2, amazon.titan-text-express |
+| Azure OpenAI | `azure-openai` | `AZURE_OPENAI_API_KEY` | Your deployed model name |
 | Ollama | `ollama` | None (local) | Any model pulled locally |
 | Custom | `custom` | User-defined | Bring your own |
 
@@ -427,7 +431,12 @@ API keys are read from environment variables only. They are never stored in the 
 | Contains | `contains` | 0 or 1 | Checks if output contains the expected text |
 | Regex | `regex` | 0 or 1 | Tests expected as a regex pattern against the output |
 | JSON Match | `json-match` | 0 or 1 | Deep JSON comparison; supports `{ partial: true }` for subset matching |
+| JSON Schema | `json-schema` | 0 or 1 | Validates output against a JSON schema |
 | Cosine Similarity | `cosine-similarity` | 0.0-1.0 | Token-frequency vector similarity |
+| Levenshtein | `levenshtein` | 0.0-1.0 | Edit-distance-based similarity |
+| BLEU | `bleu` | 0.0-1.0 | Machine translation quality metric |
+| ROUGE | `rouge` | 0.0-1.0 | Recall-oriented summary evaluation |
+| Embedding Similarity | `embedding-similarity` | 0.0-1.0 | Embedding-based semantic similarity |
 | LLM Judge | `llm-judge` | 0.0-1.0 | Uses an LLM to evaluate output against a custom rubric |
 | Weighted Composite | `composite` | 0.0-1.0 | Combine multiple scorers with custom weights |
 
@@ -452,7 +461,7 @@ Built-in pricing for 50+ models. Cost is calculated automatically per request:
 | gpt-4o | $2.50 | $10.00 |
 | gpt-4o-mini | $0.15 | $0.60 |
 | claude-sonnet-4-6 | $3.00 | $15.00 |
-| claude-haiku-4-5 | $0.80 | $4.00 |
+| claude-haiku-4-5 | $1.00 | $5.00 |
 | gemini-2.0-flash | $0.10 | $0.40 |
 
 Unknown models (including Ollama) report $0 with a warning.
