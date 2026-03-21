@@ -2,6 +2,7 @@ import type { Project } from "@llmbench/types";
 import { count, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { LLMBenchDB } from "../client.js";
+import { DEFAULT_LIMITS } from "../constants.js";
 import { projects } from "../schema/index.js";
 
 export class ProjectRepository {
@@ -41,7 +42,7 @@ export class ProjectRepository {
 		const rows = this.db
 			.select()
 			.from(projects)
-			.limit(options?.limit ?? 1000)
+			.limit(options?.limit ?? DEFAULT_LIMITS.BROWSE)
 			.offset(options?.offset ?? 0)
 			.all();
 		return rows.map((row) => ({
