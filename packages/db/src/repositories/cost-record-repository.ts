@@ -2,6 +2,7 @@ import type { CostRecord } from "@llmbench/types";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { LLMBenchDB } from "../client.js";
+import { DEFAULT_LIMITS } from "../constants.js";
 import { costRecords } from "../schema/index.js";
 
 export class CostRecordRepository {
@@ -20,7 +21,16 @@ export class CostRecordRepository {
 		return record;
 	}
 
-	async findByRunId(runId: string): Promise<CostRecord[]> {
-		return this.db.select().from(costRecords).where(eq(costRecords.runId, runId)).all();
+	async findByRunId(
+		runId: string,
+		options?: { limit?: number; offset?: number },
+	): Promise<CostRecord[]> {
+		return this.db
+			.select()
+			.from(costRecords)
+			.where(eq(costRecords.runId, runId))
+			.limit(options?.limit ?? DEFAULT_LIMITS.BROWSE)
+			.offset(options?.offset ?? 0)
+			.all();
 	}
 }
