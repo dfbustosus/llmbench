@@ -11,7 +11,7 @@ LLMBench is an open-source LLM benchmarking and evaluation platform. It's a Type
 ```bash
 pnpm install          # Install dependencies
 pnpm build            # Build all packages (via Turborepo, respects dependency order)
-pnpm test             # Run all tests (via Turborepo, requires build first)
+pnpm test             # Run all tests (via Turborepo; `build` runs automatically as a dependency)
 pnpm lint             # Lint with Biome
 pnpm lint:fix         # Lint and auto-fix with Biome
 pnpm dev              # Dev mode with watch (all packages)
@@ -43,17 +43,17 @@ npx vitest run packages/core/src/__tests__/scorers.test.ts
 ### Packages
 
 - **`@llmbench/types`** — Pure TypeScript interfaces/types, zero runtime deps. All shared contracts (`IProvider`, `IScorer`, `LLMBenchConfig`, `EvalRun`, etc.) live here. Modify types here first when changing interfaces.
-- **`@llmbench/db`** — Drizzle ORM + better-sqlite3. Schema in `src/schema/index.ts`, repository pattern in `src/repositories/`. Uses WAL mode. Tests use in-memory SQLite. Repositories: Project, Dataset, TestCase, EvalRun, EvalResult, Score, CostRecord, Provider.
+- **`@llmbench/db`** — Drizzle ORM + better-sqlite3. Schema in `src/schema/index.ts`, repository pattern in `src/repositories/`. Uses WAL mode. Tests use in-memory SQLite. All IDs are text (string-based, not UUID). Repositories: Project, Dataset, TestCase, EvalRun, EvalResult, Score, CostRecord, Provider, Cache.
 - **`@llmbench/core`** — Evaluation engine, LLM providers, scorers, cost calculator, config loader. Key entry points: `createProvider()` factory, `createScorer()` factory, `EvaluationEngine` class.
 - **`@llmbench/ui`** — React component library (shadcn/ui + CVA + tailwind-merge). Peer dep on React 19.
 - **`apps/cli`** (`llmbench`) — Commander-based CLI. Commands: `init`, `run`, `list`, `compare`, `serve`.
-- **`apps/web`** — Next.js 15 (App Router) dashboard with tRPC v11 API. tRPC routers in `src/trpc/routers/` (project, dataset, eval-run, comparison). Uses SuperJSON serialization and Zod validation.
+- **`apps/web`** — Next.js 15 (App Router) dashboard with tRPC v11 API. tRPC routers in `src/trpc/routers/` (project, dataset, eval-run, comparison). Uses SuperJSON serialization and Zod validation. Webpack config externalizes `better-sqlite3` on the server side.
 
 ### Key Patterns
 
-- **Provider pattern**: Extend `BaseProvider` in `packages/core/src/providers/`, implement `generate()`. Register in `createProvider()` factory. Add pricing to `cost/pricing-table.ts`.
-- **Scorer pattern**: Implement `IScorer` interface, place in `packages/core/src/scorers/{category}/`. Register in `createScorer()` factory. Categories: `deterministic/` (exact-match, contains, regex, json-match), `semantic/` (cosine-similarity), `llm-judge/`, `composite/` (weighted-average).
-- **Engine**: `EvaluationEngine` orchestrates runs with concurrency control (`ConcurrencyManager`), retries (`RetryHandler`), event emission (`EventBus`), and prompt interpolation (`TemplateEngine`). All in `packages/core/src/engine/`.
+- **Provider pattern**: Extend `BaseProvider` in `packages/core/src/providers/`, implement `generate()`. Register in `createProvider()` factory. Add pricing to `cost/pricing-table.ts`. Current providers (9 types): openai, azure-openai, anthropic, google, mistral, together, bedrock, ollama, custom. `OpenAICompatibleProvider` is the shared base class for openai, azure-openai, together, and mistral.
+- **Scorer pattern**: Implement `IScorer` interface, place in `packages/core/src/scorers/{category}/`. Register in `createScorer()` factory. Categories: `deterministic/` (exact-match, contains, regex, json-match, json-schema), `semantic/` (cosine-similarity, levenshtein, bleu, rouge, embedding-similarity), `llm-judge/`, `composite/` (weighted-average).
+- **Engine**: `EvaluationEngine` orchestrates runs with concurrency control (`ConcurrencyManager`), retries (`RetryHandler`), event emission (`EventBus`), prompt interpolation (`TemplateEngine`), and response caching (`CacheManager` — SHA-256 keyed with optional TTL). All in `packages/core/src/engine/`.
 - **Template engine**: `interpolate()` and `interpolateMessages()` substitute `{{variable}}` placeholders in prompts using test case context. Supports both string prompts and `ChatMessage[]` multi-turn inputs.
 - **Subpath exports**: `@llmbench/core` exposes subpaths: `./providers`, `./scorers`, `./engine`, `./cost`, `./comparison`, `./config`.
 - **All packages are ESM** (`"type": "module"`). Use `.js` extensions in imports even for TypeScript files.
