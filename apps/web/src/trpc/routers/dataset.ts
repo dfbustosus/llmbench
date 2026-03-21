@@ -19,7 +19,10 @@ export const datasetRouter = router({
 			}),
 		)
 		.mutation(async ({ input }) => {
-			return getRepos().dataset.create(input);
+			const repos = getRepos();
+			const existing = await repos.dataset.findByNameInProject(input.projectId, input.name);
+			const nextVersion = existing.length > 0 ? existing[0].version + 1 : 1;
+			return repos.dataset.create({ ...input, version: nextVersion });
 		}),
 
 	getTestCases: publicProcedure.input(z.string()).query(async ({ input }) => {
