@@ -2,6 +2,7 @@ import type { ChatMessage, TestCase, TestCaseAssertion } from "@llmbench/types";
 import { asc, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { LLMBenchDB } from "../client.js";
+import { BATCH_CHUNK_SIZE, DEFAULT_LIMITS } from "../constants.js";
 import { testCases } from "../schema/index.js";
 
 export class TestCaseRepository {
@@ -72,12 +73,20 @@ export class TestCaseRepository {
 
 		// SQLite has a ~32766 bind variable limit. With 10 columns per row,
 		// insert in chunks of 500 to stay well under the limit.
-		const CHUNK_SIZE = 500;
-		for (let i = 0; i < records.length; i += CHUNK_SIZE) {
-			this.db
-				.insert(testCases)
-				.values(records.slice(i, i + CHUNK_SIZE))
-				.run();
+		// Wrapped in a transaction so all chunks commit or none do.
+		const CHUNK_SIZE = BATCH_CHUNK_SIZE;
+		this.db.run(/* sql */ `BEGIN TRANSACTION`);
+		try {
+			for (let i = 0; i < records.length; i += CHUNK_SIZE) {
+				this.db
+					.insert(testCases)
+					.values(records.slice(i, i + CHUNK_SIZE))
+					.run();
+			}
+			this.db.run(/* sql */ `COMMIT`);
+		} catch (e) {
+			this.db.run(/* sql */ `ROLLBACK`);
+			throw e;
 		}
 
 		return records.map((r, i) => ({
@@ -102,7 +111,7 @@ export class TestCaseRepository {
 			.from(testCases)
 			.where(eq(testCases.datasetId, datasetId))
 			.orderBy(asc(testCases.orderIndex))
-			.limit(options?.limit ?? 10000)
+			.limit(options?.limit ?? DEFAULT_LIMITS.OPERATIONAL)
 			.offset(options?.offset ?? 0)
 			.all();
 		return rows.map(this.toTestCase);
