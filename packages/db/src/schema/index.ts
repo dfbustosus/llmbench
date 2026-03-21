@@ -22,7 +22,10 @@ export const datasets = sqliteTable(
 		createdAt: text("created_at").notNull(),
 		updatedAt: text("updated_at").notNull(),
 	},
-	(table) => [index("idx_datasets_project_id").on(table.projectId)],
+	(table) => [
+		index("idx_datasets_project_id").on(table.projectId),
+		uniqueIndex("idx_datasets_project_name_version").on(table.projectId, table.name, table.version),
+	],
 );
 
 export const testCases = sqliteTable(
@@ -60,7 +63,10 @@ export const providers = sqliteTable(
 		createdAt: text("created_at").notNull(),
 		updatedAt: text("updated_at").notNull(),
 	},
-	(table) => [index("idx_providers_project_id").on(table.projectId)],
+	(table) => [
+		index("idx_providers_project_id").on(table.projectId),
+		uniqueIndex("idx_providers_project_name").on(table.projectId, table.name),
+	],
 );
 
 export const evalRuns = sqliteTable(
