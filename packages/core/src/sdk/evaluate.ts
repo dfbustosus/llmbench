@@ -201,13 +201,16 @@ export async function evaluate(options: EvaluateOptions): Promise<EvaluateResult
 	const providerIds: string[] = [];
 
 	for (const pc of options.providers) {
-		const provRecord = await providerRepo.create({
-			projectId: project.id,
-			type: pc.type,
-			name: pc.name,
-			model: pc.model,
-			config: sanitizeProviderConfig(pc),
-		});
+		let provRecord = await providerRepo.findByProjectAndName(project.id, pc.name);
+		if (!provRecord) {
+			provRecord = await providerRepo.create({
+				projectId: project.id,
+				type: pc.type,
+				name: pc.name,
+				model: pc.model,
+				config: sanitizeProviderConfig(pc),
+			});
+		}
 
 		const customFn = pc.type === "custom" ? options.customProviders?.get(pc.name) : undefined;
 		const provider = createProvider(pc, customFn);
