@@ -39,8 +39,8 @@
 	},
 	"devDependencies": {
 		"@types/better-sqlite3": "7.6.13",
-		"drizzle-kit": "^0.31.4",
+		"drizzle-kit": "^0.31.10",
 		"typescript": "^5.9.3",
-		"vitest": "^4.0.18"
+		"vitest": "^4.1.0"
 	}
 }
