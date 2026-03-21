@@ -23,7 +23,7 @@ export function createInMemoryDB() {
 	return db;
 }
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 export function initializeDB(db: LLMBenchDB) {
 	// 1. Create schema_migrations table
@@ -265,16 +265,9 @@ function createUniqueIndexes(db: LLMBenchDB) {
 	if (deletedScores.changes > 0) {
 		console.log(`Removed ${deletedScores.changes} duplicate score(s) (by result_id, scorer_id).`);
 	}
-	try {
-		db.run(
-			`CREATE UNIQUE INDEX IF NOT EXISTS idx_scores_result_scorer ON scores(result_id, scorer_id)`,
-		);
-	} catch (e) {
-		console.warn(
-			"Warning: Could not create unique index idx_scores_result_scorer.",
-			e instanceof Error ? e.message : e,
-		);
-	}
+	db.run(
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_scores_result_scorer ON scores(result_id, scorer_id)`,
+	);
 
 	// Deduplicate eval_results before creating the unique index
 	const deletedResults = db.run(
@@ -285,22 +278,48 @@ function createUniqueIndexes(db: LLMBenchDB) {
 			`Removed ${deletedResults.changes} duplicate eval result(s) (by run_id, test_case_id, provider_id).`,
 		);
 	}
-	try {
-		db.run(
-			`CREATE UNIQUE INDEX IF NOT EXISTS idx_eval_results_unique ON eval_results(run_id, test_case_id, provider_id)`,
-		);
-	} catch (e) {
-		console.warn(
-			"Warning: Could not create unique index idx_eval_results_unique.",
-			e instanceof Error ? e.message : e,
+	db.run(
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_eval_results_unique ON eval_results(run_id, test_case_id, provider_id)`,
+	);
+
+	// Deduplicate providers before creating the unique index
+	const deletedProviders = db.run(
+		`DELETE FROM providers WHERE id NOT IN (SELECT MIN(id) FROM providers GROUP BY project_id, name)`,
+	);
+	if (deletedProviders.changes > 0) {
+		console.log(`Removed ${deletedProviders.changes} duplicate provider(s) (by project_id, name).`);
+	}
+	db.run(
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_providers_project_name ON providers(project_id, name)`,
+	);
+
+	// Deduplicate datasets before creating the unique index
+	const deletedDatasets = db.run(
+		`DELETE FROM datasets WHERE id NOT IN (SELECT MIN(id) FROM datasets GROUP BY project_id, name, version)`,
+	);
+	if (deletedDatasets.changes > 0) {
+		console.log(
+			`Removed ${deletedDatasets.changes} duplicate dataset(s) (by project_id, name, version).`,
 		);
 	}
+	db.run(
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_datasets_project_name_version ON datasets(project_id, name, version)`,
+	);
 }
 
 function runMigrations(db: LLMBenchDB, fromVersion: number) {
 	if (fromVersion < 1) {
 		migrateToV1(db);
 	}
+	if (fromVersion < 2) {
+		migrateToV2(db);
+	}
+}
+
+/** Check whether a column exists on a table (avoids try/catch ALTER TABLE). */
+function columnExists(db: LLMBenchDB, table: string, column: string): boolean {
+	const rows = db.all(/* sql */ `PRAGMA table_info(${table})`) as Array<{ name: string }>;
+	return rows.some((r) => r.name === column);
 }
 
 function migrateToV1(db: LLMBenchDB) {
@@ -311,25 +330,17 @@ function migrateToV1(db: LLMBenchDB) {
 		db.run(`BEGIN TRANSACTION`);
 
 		// Add columns that may be missing on older databases
-		try {
+		if (!columnExists(db, "test_cases", "messages")) {
 			db.run(`ALTER TABLE test_cases ADD COLUMN messages TEXT`);
-		} catch {
-			// Column already exists
 		}
-		try {
+		if (!columnExists(db, "test_cases", "assert")) {
 			db.run(`ALTER TABLE test_cases ADD COLUMN assert TEXT`);
-		} catch {
-			// Column already exists
 		}
-		try {
+		if (!columnExists(db, "datasets", "content_hash")) {
 			db.run(`ALTER TABLE datasets ADD COLUMN content_hash TEXT`);
-		} catch {
-			// Column already exists
 		}
-		try {
+		if (!columnExists(db, "eval_runs", "dataset_version")) {
 			db.run(`ALTER TABLE eval_runs ADD COLUMN dataset_version INTEGER`);
-		} catch {
-			// Column already exists
 		}
 
 		// Clean up orphaned eval_events before adding FK constraint
@@ -430,5 +441,13 @@ function migrateToV1(db: LLMBenchDB) {
 
 	// Recreate all indexes (they are dropped when tables are dropped)
 	createIndexes(db);
+	createUniqueIndexes(db);
+}
+
+function migrateToV2(db: LLMBenchDB) {
+	// V2 adds UNIQUE constraints on providers(project_id, name) and
+	// datasets(project_id, name, version). The dedup + index creation is
+	// handled by createUniqueIndexes() which runs for every init, so we
+	// only need to ensure the indexes are present.
 	createUniqueIndexes(db);
 }
