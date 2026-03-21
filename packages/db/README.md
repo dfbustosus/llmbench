@@ -83,6 +83,8 @@ initializeDB(db);
 
 `createDB` enables WAL journal mode and foreign key constraints automatically.
 
+`initializeDB` creates all tables, indexes, and unique constraints. For existing databases, it runs versioned migrations automatically (tracking progress in a `schema_migrations` table). Duplicate rows are deduplicated before unique indexes are applied.
+
 ## Repositories
 
 ### ProjectRepository
@@ -92,7 +94,8 @@ const repo = new ProjectRepository(db);
 
 const project = await repo.create({ name: "My Project", description: "Optional" });
 const found = await repo.findById(project.id);
-const all = await repo.findAll();
+const all = await repo.findAll({ limit: 100, offset: 0 });  // pagination optional
+const total = await repo.countAll();
 const updated = await repo.update(project.id, { name: "New Name" });
 const deleted = await repo.delete(project.id);  // cascades to datasets, runs, etc.
 ```
@@ -108,7 +111,8 @@ const dataset = await repo.create({
   description: "Optional",
 });
 const found = await repo.findById(dataset.id);
-const byProject = await repo.findByProjectId(project.id);
+const byProject = await repo.findByProjectId(project.id, { limit: 50 });
+const byName = await repo.findByNameInProject(project.id, "QA Dataset");  // sorted by version DESC
 const updated = await repo.update(dataset.id, { name: "Renamed", version: 2 });
 const deleted = await repo.delete(dataset.id);  // cascades to test cases
 ```
@@ -123,8 +127,10 @@ const tc = await repo.create({
   datasetId: dataset.id,
   input: "What is the capital of France?",
   expected: "Paris",
-  context: { difficulty: "easy" },     // optional JSON metadata
-  tags: ["geography", "europe"],        // optional string array
+  messages: [{ role: "user", content: "..." }],  // optional: multi-turn
+  context: { difficulty: "easy" },     // optional: template variables
+  tags: ["geography", "europe"],       // optional: filtering
+  assert: [{ type: "contains", value: "Paris" }], // optional: per-test assertions
   orderIndex: 0,
 });
 
@@ -134,7 +140,7 @@ const cases = await repo.createMany([
   { datasetId: dataset.id, input: "Q2", expected: "A2" },
 ]);
 
-const byDataset = await repo.findByDatasetId(dataset.id);
+const byDataset = await repo.findByDatasetId(dataset.id, { limit: 500 });
 const found = await repo.findById(tc.id);
 const deleted = await repo.delete(tc.id);
 const count = await repo.deleteByDatasetId(dataset.id);  // returns number deleted
@@ -160,7 +166,9 @@ const run = await repo.create({
 });
 
 const found = await repo.findById(run.id);
-const byProject = await repo.findByProjectId(project.id, 50);  // limit defaults to 50
+const byProject = await repo.findByProjectId(project.id, { limit: 50 });
+const recent = await repo.findRecent(10);  // most recent across all projects
+const counts = await repo.countAll();      // { total: number, active: number }
 
 await repo.updateStatus(run.id, "running");
 await repo.updateStatus(run.id, "completed");  // auto-sets completedAt
@@ -214,13 +222,15 @@ await repo.create(result.id, {
   metadata: {},
 });
 
-// Save multiple scores at once
+// Save multiple scores at once (batched + transactional)
 await repo.createMany(result.id, [
   { scorerId: "exact-match", scorerName: "Exact Match", scorerType: "exact-match", value: 1 },
   { scorerId: "contains", scorerName: "Contains", scorerType: "contains", value: 1 },
 ]);
 
 const scores = await repo.findByResultId(result.id);
+const byRun = await repo.findByRunId(run.id, { limit: 5000 });  // Record<resultId, ScoreResult[]>
+const deleted = await repo.deleteByRunId(run.id);                // returns count deleted
 ```
 
 ### CostRecordRepository
@@ -240,7 +250,7 @@ await repo.create({
   totalCost: 0.0075,
 });
 
-const costRecords = await repo.findByRunId(run.id);
+const costRecords = await repo.findByRunId(run.id, { limit: 100 });
 ```
 
 ### ProviderRepository
@@ -253,10 +263,14 @@ const provider = await repo.create({
   type: "openai",
   name: "GPT-4o",
   model: "gpt-4o",
-  config: { type: "openai", name: "GPT-4o", model: "gpt-4o" },
+  config: { temperature: 0, maxTokens: 1024 },
 });
 
+const found = await repo.findById(provider.id);
 const byProject = await repo.findByProjectId(project.id);
+const byName = await repo.findByProjectAndName(project.id, "GPT-4o");  // leverages unique index
+const updated = await repo.update(provider.id, { model: "gpt-4o-mini" });
+const deleted = await repo.delete(provider.id);  // cascades to eval_results, cost_records
 ```
 
 ### CacheRepository
@@ -275,8 +289,10 @@ const deleted = await repo.deleteAll(); // clear entire cache
 const repo = new EventRepository(db);
 
 // Events are persisted by EventPersister in @llmbench/core
-const events = await repo.findByRunId(runId);  // for SSE streaming
-repo.deleteStale();                             // clean up old events
+repo.insert({ runId, eventType: "run:started", payload: "{}", timestamp: new Date().toISOString() });
+const events = repo.findAfterCursor(runId, 0, 100);  // cursor-based SSE streaming
+repo.deleteByRunId(runId);                            // clean up events for a specific run
+repo.deleteStale();                                   // clean up events for completed/failed runs
 ```
 
 ## Schema
@@ -299,9 +315,32 @@ repo.deleteStale();                             // clean up old events
 ### Cascade Rules
 
 - Delete a **project** → cascades to datasets, providers, eval_runs
-- Delete a **dataset** → cascades to test_cases
-- Delete an **eval_run** → cascades to eval_results, cost_records
+- Delete a **dataset** → cascades to test_cases, and to eval_runs (via dataset_id FK)
+- Delete a **provider** → cascades to eval_results and cost_records (via provider_id FK)
+- Delete an **eval_run** → cascades to eval_results, cost_records, eval_events
 - Delete an **eval_result** → cascades to scores
+- Delete a **test_case** → cascades to eval_results (via test_case_id FK)
+
+### Unique Constraints
+
+- `providers(project_id, name)` — one provider name per project
+- `datasets(project_id, name, version)` — one version per dataset name per project
+- `eval_results(run_id, test_case_id, provider_id)` — one result per test case per provider per run
+- `scores(result_id, scorer_id)` — one score per scorer per result
+- `cache_entries(cache_key)` — unique cache keys
+
+### Pagination
+
+All list methods accept optional `{ limit, offset }`. Defaults are defined in `DEFAULT_LIMITS`:
+
+| Constant | Value | Used by |
+|----------|-------|---------|
+| `BROWSE` | 1,000 | Projects, datasets, providers, cost records |
+| `RUNS` | 50 | Eval runs per project |
+| `OPERATIONAL` | 5,000 | Test cases, eval results |
+| `SCORES` | 10,000 | Scores joined across results |
+
+Override per-call: `repo.findByDatasetId(id, { limit: 100, offset: 200 })`.
 
 ### Implementation Details
 
