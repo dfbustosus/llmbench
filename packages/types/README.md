@@ -52,7 +52,8 @@ import type {
   IProvider,
 } from "@llmbench/types";
 
-// ProviderType = "openai" | "anthropic" | "google" | "ollama" | "custom"
+// ProviderType = "openai" | "azure-openai" | "anthropic" | "google" | "mistral"
+//              | "together" | "bedrock" | "ollama" | "custom"
 
 const config: ProviderConfig = {
   type: "openai",
