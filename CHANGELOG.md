@@ -5,7 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.5] - 2026-03-15
+## [1.0.1] - 2026-03-21
+
+### Added
+
+- UNIQUE constraint on `providers(project_id, name)` — prevents duplicate provider names per project
+- UNIQUE constraint on `datasets(project_id, name, version)` — prevents duplicate dataset versions
+- Schema migration V2 with deduplication of pre-existing duplicate rows
+- `columnExists()` helper for safe schema introspection during migrations
+- `ProviderRepository.findByProjectAndName()` — efficient O(1) lookup leveraging unique index
+- `ProviderRepository.update()` — update provider type, model, or config after creation
+- Pagination (`limit`/`offset`) on `CostRecordRepository.findByRunId()` and `ScoreRepository.findByRunId()`
+- `DEFAULT_LIMITS` and `BATCH_CHUNK_SIZE` shared constants — single source of truth for pagination defaults
+- Dependabot configuration for automated dependency updates
+- CODE_OF_CONDUCT.md (Contributor Covenant v2.1)
+- GitHub issue templates (bug report, feature request) and PR template
+- `apps/web/README.md` with architecture, tech stack, and development setup
+
+### Fixed
+
+- Migration system no longer swallows real errors — replaced `try/catch ALTER TABLE` with `columnExists()` checks
+- `TestCaseRepository.createMany()` and `ScoreRepository.createMany()` now wrapped in transactions for atomicity across chunks
+- SDK `evaluate()` now uses find-or-create for providers — prevents unique constraint crash on repeated calls
+- Provider lookup in CLI commands uses `findByProjectAndName()` — O(1) indexed query instead of fetch-all + filter
+- Dataset creation in `eval` command and web dashboard uses auto-versioning to prevent constraint violations
+- Pagination defaults extracted from magic numbers to named `DEFAULT_LIMITS` constants (DRY)
+- `@llmbench/db` README rewritten — fixed 31 inaccuracies including wrong method names, missing methods, incorrect API signatures, and undocumented pagination
+- `apps/cli/README.md` — fixed scorer count (7 → 12), added 4 missing providers, fixed Claude Haiku pricing
+- All documentation updated to reflect correct 1.0.0 versioning (was 0.1.x)
+- Removed phantom "openai-compatible" provider type from docs (it's a base class, not a standalone type)
+
+### Changed
+
+- Schema version bumped to 2
+- CI security audit now fails on critical/high advisories (previously `continue-on-error`)
+
+## [1.0.0] - 2026-03-15
 
 ### Added
 
@@ -32,73 +67,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SDK functions: `evaluate()` and `evaluateQuick()` for programmatic usage
 - Response caching with SHA-256 keys and optional TTL expiry
 - Dataset versioning with content hash tracking
-- `assert` column migration for existing databases
-
-### Changed
-
-- Config loader now searches `.yaml` and `.yml` in addition to `.ts`, `.js`, `.mjs`
-- `run` command dataset validation moved to shared `loadDataset()` in `@llmbench/core`
-- `EvaluationEngine` pre-creates scorers from assertions before provider calls (fail-fast)
-- Content hash computation includes `assert` field for dataset versioning
-- Updated documentation across all packages
-
-## [0.1.4] - 2026-03-08
-
-### Added
-
 - CI gate system with threshold-based pass/fail for `run` and `compare` commands
-- `--threshold`, `--max-failure-rate`, and `--json` flags for `llmbench run`
-- `--fail-on-regression`, `--min-severity`, and `--json` flags for `llmbench compare`
 - Per-provider score breakdown in the web dashboard
-- Provider column in run detail results table (shown for multi-provider runs)
-- Score columns with color-coded values (green/yellow/red) in results table
 - Batch score fetching via `ScoreRepository.findByRunId()`
-- `getScoresByRunId` and `getProvidersByProject` tRPC endpoints
-- Latency chart shows provider names in multi-provider runs
 - Prompt template engine with variable interpolation
-- `messages` and `context` fields in test case datasets
 - Multi-turn conversation support (`ChatMessage[]`) for all providers
-- System message support in `BaseProvider`
-- SECURITY.md with vulnerability reporting policy
-- CHANGELOG.md
-- `bugs` and `homepage` fields in all publishable package.json files
-- tRPC error logging in API route handler
-
-### Fixed
-
-- Score distribution chart now uses actual scorer data instead of error-based fallback
-- Web dashboard 500 errors caused by better-sqlite3 native bindings in webpack (externalized)
-- DB singleton persistence across Next.js HMR reloads via `globalThis`
-- Gate config validation in config loader
-
-## [0.1.3] - 2026-03-06
-
-### Added
-
-- Comprehensive READMEs with examples for all packages
-- npm publish metadata for all packages
-
-## [0.1.2] - 2026-02-15
-
-### Added
-
+- Graceful cancellation with `AbortSignal` support
 - Run comparison with regression detection (`llmbench compare`)
 - Cost tracking and pricing table for major LLM providers
 - Web dashboard with project, dataset, and run views
-
-## [0.1.1] - 2026-01-20
-
-### Added
-
 - Multi-provider evaluation support
-- Configurable scorers (exact-match, contains, levenshtein, llm-judge)
-- SQLite storage with repository pattern
-
-## [0.1.0] - 2026-01-05
-
-### Added
-
-- Initial release
-- CLI with `init`, `run`, `list`, and `serve` commands
-- OpenAI and Anthropic provider support
-- Basic evaluation engine with concurrency control
+- 12 built-in scorers across deterministic, semantic, LLM-judge, and composite categories
+- 9 provider integrations: OpenAI, Anthropic, Google AI, Mistral, Together AI, AWS Bedrock, Azure OpenAI, Ollama, custom
+- CLI with `init`, `run`, `eval`, `list`, `compare`, and `serve` commands
+- SQLite storage with repository pattern and WAL mode
+- SECURITY.md, CONTRIBUTING.md, CHANGELOG.md
+- Comprehensive READMEs for all packages
+- npm provenance attestation in release pipeline
