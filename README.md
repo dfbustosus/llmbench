@@ -36,7 +36,7 @@ npx @llmbench/cli eval "What is the capital of France?" -p openai:gpt-4o -p anth
 
 ## Features
 
-- **10 providers** — OpenAI, Anthropic, Google AI, Mistral, Together AI, AWS Bedrock, Azure OpenAI, Ollama, any OpenAI-compatible endpoint, or fully custom providers. Compare side-by-side.
+- **9 providers** — OpenAI, Anthropic, Google AI, Mistral, Together AI, AWS Bedrock, Azure OpenAI, Ollama, or fully custom providers. Compare side-by-side.
 - **12 built-in scorers** — Exact match, contains, regex, JSON deep compare, JSON schema validation, cosine similarity, Levenshtein distance, BLEU, ROUGE, embedding similarity, LLM-as-judge, and weighted composite.
 - **Per-test-case assertions** — Override global scorers on individual test cases with inline `assert` rules. Test different criteria per prompt.
 - **Graceful cancellation** — Press Ctrl+C for cooperative cancellation that lets in-flight API calls finish. Double Ctrl+C to force quit. Cancel stuck runs from the web dashboard. Full `AbortSignal` support in the SDK.
@@ -302,7 +302,6 @@ See [@llmbench/core README](packages/core/README.md) for full SDK documentation.
 | AWS Bedrock | `bedrock` | AWS credentials (env or profile) |
 | Azure OpenAI | `azure-openai` | `AZURE_OPENAI_API_KEY` |
 | Ollama | `ollama` | None (local) |
-| OpenAI-compatible | `openai-compatible` | Varies by endpoint |
 | Custom | `custom` | User-defined |
 
 API keys are read from environment variables only. They are never stored in the database or config files.
