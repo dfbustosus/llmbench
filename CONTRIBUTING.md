@@ -4,7 +4,7 @@ Thank you for your interest in contributing to LLMBench! This guide will help yo
 
 ## Code of Conduct
 
-By participating in this project, you agree to maintain a respectful and inclusive environment for everyone.
+This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you agree to uphold this code. Please report unacceptable behavior to **dfbustos@uninorte.edu.co**.
 
 ## Getting Started
 
