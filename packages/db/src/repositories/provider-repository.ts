@@ -1,5 +1,5 @@
 import type { ProviderConfig, ProviderType } from "@llmbench/types";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { LLMBenchDB } from "../client.js";
 import { providers } from "../schema/index.js";
@@ -60,6 +60,30 @@ export class ProviderRepository {
 	async findByProjectId(projectId: string): Promise<ProviderRecord[]> {
 		const rows = this.db.select().from(providers).where(eq(providers.projectId, projectId)).all();
 		return rows.map(this.toRecord);
+	}
+
+	async findByProjectAndName(projectId: string, name: string): Promise<ProviderRecord | null> {
+		const row = this.db
+			.select()
+			.from(providers)
+			.where(and(eq(providers.projectId, projectId), eq(providers.name, name)))
+			.get();
+		if (!row) return null;
+		return this.toRecord(row);
+	}
+
+	async update(
+		id: string,
+		data: { type?: ProviderType; name?: string; model?: string; config?: Partial<ProviderConfig> },
+	): Promise<ProviderRecord | null> {
+		const now = new Date().toISOString();
+		const updates: Record<string, unknown> = { updatedAt: now };
+		if (data.type !== undefined) updates.type = data.type;
+		if (data.name !== undefined) updates.name = data.name;
+		if (data.model !== undefined) updates.model = data.model;
+		if (data.config !== undefined) updates.config = JSON.stringify(data.config);
+		this.db.update(providers).set(updates).where(eq(providers.id, id)).run();
+		return this.findById(id);
 	}
 
 	async delete(id: string): Promise<boolean> {
