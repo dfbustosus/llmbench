@@ -251,9 +251,7 @@ export const runCommand = new Command("run")
 			const providerIds: string[] = [];
 
 			for (const pc of config.providers) {
-				let providerRecord = (await providerRepo.findByProjectId(project.id)).find(
-					(p) => p.name === pc.name && p.model === pc.model,
-				);
+				let providerRecord = await providerRepo.findByProjectAndName(project.id, pc.name);
 				if (!providerRecord) {
 					providerRecord = await providerRepo.create({
 						projectId: project.id,
