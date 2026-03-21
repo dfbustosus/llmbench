@@ -2,6 +2,7 @@ import type { ScoreResult } from "@llmbench/types";
 import { eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { LLMBenchDB } from "../client.js";
+import { BATCH_CHUNK_SIZE, DEFAULT_LIMITS } from "../constants.js";
 import { evalResults, scores } from "../schema/index.js";
 
 export class ScoreRepository {
@@ -42,12 +43,20 @@ export class ScoreRepository {
 
 		// SQLite has a ~32766 bind variable limit. With 9 columns per row,
 		// insert in chunks of 500 to stay well under the limit.
-		const CHUNK_SIZE = 500;
-		for (let i = 0; i < records.length; i += CHUNK_SIZE) {
-			this.db
-				.insert(scores)
-				.values(records.slice(i, i + CHUNK_SIZE))
-				.run();
+		// Wrapped in a transaction so all chunks commit or none do.
+		const CHUNK_SIZE = BATCH_CHUNK_SIZE;
+		this.db.run(/* sql */ `BEGIN TRANSACTION`);
+		try {
+			for (let i = 0; i < records.length; i += CHUNK_SIZE) {
+				this.db
+					.insert(scores)
+					.values(records.slice(i, i + CHUNK_SIZE))
+					.run();
+			}
+			this.db.run(/* sql */ `COMMIT`);
+		} catch (e) {
+			this.db.run(/* sql */ `ROLLBACK`);
+			throw e;
 		}
 	}
 
@@ -56,7 +65,10 @@ export class ScoreRepository {
 		return rows.map(this.toScoreResult);
 	}
 
-	async findByRunId(runId: string): Promise<Record<string, ScoreResult[]>> {
+	async findByRunId(
+		runId: string,
+		options?: { limit?: number; offset?: number },
+	): Promise<Record<string, ScoreResult[]>> {
 		const rows = this.db
 			.select({
 				resultId: scores.resultId,
@@ -71,6 +83,8 @@ export class ScoreRepository {
 			.from(scores)
 			.innerJoin(evalResults, eq(scores.resultId, evalResults.id))
 			.where(eq(evalResults.runId, runId))
+			.limit(options?.limit ?? DEFAULT_LIMITS.SCORES)
+			.offset(options?.offset ?? 0)
 			.all();
 
 		const result: Record<string, ScoreResult[]> = {};
