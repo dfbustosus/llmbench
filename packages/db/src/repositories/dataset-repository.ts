@@ -2,6 +2,7 @@ import type { Dataset } from "@llmbench/types";
 import { and, desc, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { LLMBenchDB } from "../client.js";
+import { DEFAULT_LIMITS } from "../constants.js";
 import { datasets } from "../schema/index.js";
 
 export class DatasetRepository {
@@ -49,7 +50,7 @@ export class DatasetRepository {
 			.select()
 			.from(datasets)
 			.where(eq(datasets.projectId, projectId))
-			.limit(options?.limit ?? 1000)
+			.limit(options?.limit ?? DEFAULT_LIMITS.BROWSE)
 			.offset(options?.offset ?? 0)
 			.all();
 		return rows.map(this.toDataset);
