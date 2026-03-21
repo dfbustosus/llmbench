@@ -2,6 +2,7 @@ import type { EvalResult } from "@llmbench/types";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { LLMBenchDB } from "../client.js";
+import { DEFAULT_LIMITS } from "../constants.js";
 import { evalResults } from "../schema/index.js";
 
 export class EvalResultRepository {
@@ -72,7 +73,7 @@ export class EvalResultRepository {
 			.select()
 			.from(evalResults)
 			.where(eq(evalResults.runId, runId))
-			.limit(options?.limit ?? 10000)
+			.limit(options?.limit ?? DEFAULT_LIMITS.OPERATIONAL)
 			.offset(options?.offset ?? 0)
 			.all();
 		return rows.map(this.toEvalResult);
