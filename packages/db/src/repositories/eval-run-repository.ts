@@ -2,6 +2,7 @@ import type { EvalRun, EvalRunConfig, EvalStatus } from "@llmbench/types";
 import { count, desc, eq, or } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import type { LLMBenchDB } from "../client.js";
+import { DEFAULT_LIMITS } from "../constants.js";
 import { evalRuns } from "../schema/index.js";
 
 export class EvalRunRepository {
@@ -57,7 +58,7 @@ export class EvalRunRepository {
 			.from(evalRuns)
 			.where(eq(evalRuns.projectId, projectId))
 			.orderBy(desc(evalRuns.createdAt))
-			.limit(options?.limit ?? 50)
+			.limit(options?.limit ?? DEFAULT_LIMITS.RUNS)
 			.offset(options?.offset ?? 0)
 			.all();
 		return rows.map(this.toEvalRun);
