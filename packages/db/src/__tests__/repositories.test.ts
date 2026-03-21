@@ -483,6 +483,112 @@ describe("ScoreRepository", () => {
 
 		expect(Object.keys(scoresByResult)).toHaveLength(0);
 	});
+
+	it("should bulk create scores via createMany()", async () => {
+		const projectRepo = new ProjectRepository(db);
+		const project = await projectRepo.create({ name: "Test" });
+		const datasetRepo = new DatasetRepository(db);
+		const dataset = await datasetRepo.create({ projectId: project.id, name: "DS" });
+		const tcRepo = new TestCaseRepository(db);
+		const tc = await tcRepo.create({ datasetId: dataset.id, input: "Q", expected: "A" });
+		const providerRepo = new ProviderRepository(db);
+		const provider = await providerRepo.create({
+			projectId: project.id,
+			type: "openai",
+			name: "P",
+			model: "gpt-4",
+		});
+		const runRepo = new EvalRunRepository(db);
+		const run = await runRepo.create({
+			projectId: project.id,
+			datasetId: dataset.id,
+			config: {
+				providerIds: [provider.id],
+				scorerConfigs: [],
+				concurrency: 1,
+				maxRetries: 0,
+				timeoutMs: 30000,
+			},
+			totalCases: 1,
+		});
+		const resultRepo = new EvalResultRepository(db);
+		const result = await resultRepo.create({
+			runId: run.id,
+			testCaseId: tc.id,
+			providerId: provider.id,
+			input: "Q",
+			output: "A",
+			expected: "A",
+			latencyMs: 100,
+			inputTokens: 10,
+			outputTokens: 5,
+			totalTokens: 15,
+		});
+
+		const scoreRepo = new ScoreRepository(db);
+		await scoreRepo.createMany(result.id, [
+			{ scorerId: "exact-match", scorerName: "Exact", scorerType: "exact-match", value: 1.0 },
+			{ scorerId: "contains", scorerName: "Contains", scorerType: "contains", value: 1.0 },
+		]);
+
+		const scores = await scoreRepo.findByResultId(result.id);
+		expect(scores).toHaveLength(2);
+	});
+
+	it("should delete scores by run ID", async () => {
+		const projectRepo = new ProjectRepository(db);
+		const project = await projectRepo.create({ name: "Test" });
+		const datasetRepo = new DatasetRepository(db);
+		const dataset = await datasetRepo.create({ projectId: project.id, name: "DS" });
+		const tcRepo = new TestCaseRepository(db);
+		const tc = await tcRepo.create({ datasetId: dataset.id, input: "Q", expected: "A" });
+		const providerRepo = new ProviderRepository(db);
+		const provider = await providerRepo.create({
+			projectId: project.id,
+			type: "openai",
+			name: "P",
+			model: "gpt-4",
+		});
+		const runRepo = new EvalRunRepository(db);
+		const run = await runRepo.create({
+			projectId: project.id,
+			datasetId: dataset.id,
+			config: {
+				providerIds: [provider.id],
+				scorerConfigs: [],
+				concurrency: 1,
+				maxRetries: 0,
+				timeoutMs: 30000,
+			},
+			totalCases: 1,
+		});
+		const resultRepo = new EvalResultRepository(db);
+		const result = await resultRepo.create({
+			runId: run.id,
+			testCaseId: tc.id,
+			providerId: provider.id,
+			input: "Q",
+			output: "A",
+			expected: "A",
+			latencyMs: 100,
+			inputTokens: 10,
+			outputTokens: 5,
+			totalTokens: 15,
+		});
+		const scoreRepo = new ScoreRepository(db);
+		await scoreRepo.create(result.id, {
+			scorerId: "exact-match",
+			scorerName: "Exact",
+			scorerType: "exact-match",
+			value: 1.0,
+		});
+
+		const deleted = await scoreRepo.deleteByRunId(run.id);
+		expect(deleted).toBe(1);
+
+		const remaining = await scoreRepo.findByResultId(result.id);
+		expect(remaining).toHaveLength(0);
+	});
 });
 
 describe("CostRecordRepository", () => {
@@ -914,7 +1020,7 @@ describe("Schema Migration", () => {
 		const version = rawDb.get(`SELECT version FROM schema_migrations LIMIT 1`) as {
 			version: number;
 		};
-		expect(version.version).toBe(1);
+		expect(version.version).toBe(2);
 
 		// Verify data survived migration
 		const projects = rawDb.all(`SELECT * FROM projects`);
@@ -957,7 +1063,7 @@ describe("Schema Migration", () => {
 		const version = rawDb.get(`SELECT version FROM schema_migrations LIMIT 1`) as {
 			version: number;
 		};
-		expect(version.version).toBe(1);
+		expect(version.version).toBe(2);
 	});
 });
 
@@ -1120,6 +1226,85 @@ describe("UNIQUE constraints", () => {
 		).rejects.toThrow();
 	});
 
+	it("should find provider by project and name", async () => {
+		const projectRepo = new ProjectRepository(db);
+		const project = await projectRepo.create({ name: "Test" });
+		const providerRepo = new ProviderRepository(db);
+
+		await providerRepo.create({
+			projectId: project.id,
+			type: "openai",
+			name: "GPT",
+			model: "gpt-4o",
+		});
+
+		const found = await providerRepo.findByProjectAndName(project.id, "GPT");
+		expect(found).not.toBeNull();
+		expect(found?.name).toBe("GPT");
+		expect(found?.model).toBe("gpt-4o");
+
+		const notFound = await providerRepo.findByProjectAndName(project.id, "nonexistent");
+		expect(notFound).toBeNull();
+	});
+
+	it("should update provider model and config", async () => {
+		const projectRepo = new ProjectRepository(db);
+		const project = await projectRepo.create({ name: "Test" });
+		const providerRepo = new ProviderRepository(db);
+
+		const provider = await providerRepo.create({
+			projectId: project.id,
+			type: "openai",
+			name: "GPT",
+			model: "gpt-4o",
+		});
+
+		const updated = await providerRepo.update(provider.id, { model: "gpt-4o-mini" });
+		expect(updated).not.toBeNull();
+		expect(updated?.model).toBe("gpt-4o-mini");
+		expect(updated?.name).toBe("GPT");
+	});
+
+	it("should reject duplicate providers for same project+name", async () => {
+		const projectRepo = new ProjectRepository(db);
+		const project = await projectRepo.create({ name: "Test" });
+		const providerRepo = new ProviderRepository(db);
+
+		await providerRepo.create({
+			projectId: project.id,
+			type: "openai",
+			name: "GPT",
+			model: "gpt-4",
+		});
+
+		// Same project + name should fail even with different model
+		await expect(
+			providerRepo.create({
+				projectId: project.id,
+				type: "openai",
+				name: "GPT",
+				model: "gpt-4o",
+			}),
+		).rejects.toThrow();
+	});
+
+	it("should reject duplicate datasets for same project+name+version", async () => {
+		const projectRepo = new ProjectRepository(db);
+		const project = await projectRepo.create({ name: "Test" });
+		const datasetRepo = new DatasetRepository(db);
+
+		await datasetRepo.create({ projectId: project.id, name: "DS", version: 1 });
+
+		// Same project + name + version should fail
+		await expect(
+			datasetRepo.create({ projectId: project.id, name: "DS", version: 1 }),
+		).rejects.toThrow();
+
+		// Different version should succeed
+		const v2 = await datasetRepo.create({ projectId: project.id, name: "DS", version: 2 });
+		expect(v2.version).toBe(2);
+	});
+
 	it("should reject duplicate scores for same result+scorer", async () => {
 		const projectRepo = new ProjectRepository(db);
 		const project = await projectRepo.create({ name: "Test" });
@@ -1222,6 +1407,30 @@ describe("EvalRunRepository - countAll and findRecent", () => {
 		const counts = await runRepo.countAll();
 		expect(counts.total).toBe(3);
 		expect(counts.active).toBe(2); // running + pending
+	});
+
+	it("should find runs by project with pagination", async () => {
+		const projectRepo = new ProjectRepository(db);
+		const project = await projectRepo.create({ name: "Test" });
+		const datasetRepo = new DatasetRepository(db);
+		const dataset = await datasetRepo.create({ projectId: project.id, name: "DS" });
+		const runRepo = new EvalRunRepository(db);
+		const config = {
+			providerIds: [],
+			scorerConfigs: [],
+			concurrency: 1,
+			maxRetries: 0,
+			timeoutMs: 30000,
+		};
+		await runRepo.create({ projectId: project.id, datasetId: dataset.id, config, totalCases: 0 });
+		await runRepo.create({ projectId: project.id, datasetId: dataset.id, config, totalCases: 0 });
+		await runRepo.create({ projectId: project.id, datasetId: dataset.id, config, totalCases: 0 });
+
+		const page1 = await runRepo.findByProjectId(project.id, { limit: 2 });
+		expect(page1).toHaveLength(2);
+
+		const page2 = await runRepo.findByProjectId(project.id, { limit: 2, offset: 2 });
+		expect(page2).toHaveLength(1);
 	});
 
 	it("should find recent runs across all projects sorted by date", async () => {
