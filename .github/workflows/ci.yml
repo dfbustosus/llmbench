@@ -73,6 +73,17 @@ jobs:
           node-version-file: ".nvmrc"
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - name: Audit dependencies
+
+      - name: Audit for critical/high vulnerabilities
         run: pnpm audit --audit-level=high
-        continue-on-error: true
+
+      - name: Check for known vulnerable packages
+        run: |
+          # Fail if any direct dependency has a critical advisory
+          pnpm audit --audit-level=critical --prod 2>&1 || {
+            echo "::error::Critical vulnerability found in production dependencies"
+            exit 1
+          }
+
+      - name: Verify lockfile integrity
+        run: pnpm install --frozen-lockfile --ignore-scripts 2>&1 | head -5
