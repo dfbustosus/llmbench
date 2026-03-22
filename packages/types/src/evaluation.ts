@@ -1,3 +1,4 @@
+import type { ToolCall } from "./provider.js";
 import type { ScorerConfig } from "./scoring.js";
 
 export type EvalStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
@@ -52,6 +53,7 @@ export interface EvalResult {
 		totalTokens: number;
 	};
 	cost?: number;
+	toolCalls?: ToolCall[];
 	rawResponse?: unknown;
 	createdAt: string;
 }
