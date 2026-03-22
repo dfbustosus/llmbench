@@ -4,6 +4,7 @@ import { BaseProvider } from "./base-provider.js";
 export class AnthropicProvider extends BaseProvider {
 	private apiKey: string;
 	private baseUrl: string;
+	private jsonModeWarned = false;
 
 	constructor(config: ProviderConfig) {
 		super({ ...config, type: "anthropic" });
@@ -24,7 +25,20 @@ export class AnthropicProvider extends BaseProvider {
 			// Anthropic requires system message as a separate top-level field
 			const systemMessages = allMessages.filter((m) => m.role === "system");
 			const nonSystemMessages = allMessages.filter((m) => m.role !== "system");
-			const systemText = systemMessages.map((m) => m.content).join("\n\n");
+			let systemText = systemMessages.map((m) => m.content).join("\n\n");
+
+			if (cfg.responseFormat?.type === "json_object") {
+				if (!this.jsonModeWarned) {
+					console.warn(
+						"[llmbench] Anthropic does not natively support JSON mode. " +
+							"Adding system prompt instruction for JSON output.",
+					);
+					this.jsonModeWarned = true;
+				}
+				const jsonInstruction =
+					"You must respond with valid JSON only. No markdown, no explanation, just valid JSON.";
+				systemText = systemText ? `${systemText}\n\n${jsonInstruction}` : jsonInstruction;
+			}
 
 			const body: Record<string, unknown> = {
 				model: cfg.model,
