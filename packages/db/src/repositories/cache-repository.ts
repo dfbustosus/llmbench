@@ -25,6 +25,7 @@ export class CacheRepository {
 		tokenUsage?: { inputTokens: number; outputTokens: number; totalTokens: number };
 		latencyMs?: number;
 		expiresAt?: string;
+		toolCalls?: string;
 	}): Promise<CacheEntry> {
 		const now = new Date().toISOString();
 		const entry = {
@@ -38,6 +39,7 @@ export class CacheRepository {
 			createdAt: now,
 			expiresAt: data.expiresAt ?? null,
 			hits: 0,
+			toolCalls: data.toolCalls ?? null,
 		};
 
 		this.db.insert(cacheEntries).values(entry).run();
@@ -81,6 +83,7 @@ export class CacheRepository {
 		createdAt: string;
 		expiresAt: string | null;
 		hits: number;
+		toolCalls?: string | null;
 	}): CacheEntry {
 		return {
 			id: row.id,
@@ -93,6 +96,7 @@ export class CacheRepository {
 			createdAt: row.createdAt,
 			expiresAt: row.expiresAt ?? undefined,
 			hits: row.hits,
+			toolCalls: row.toolCalls ?? undefined,
 		};
 	}
 }
