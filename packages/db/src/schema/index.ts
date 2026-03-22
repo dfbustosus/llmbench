@@ -122,6 +122,7 @@ export const evalResults = sqliteTable(
 		totalTokens: integer("total_tokens").notNull().default(0),
 		cost: real("cost"),
 		rawResponse: text("raw_response"), // JSON
+		toolCalls: text("tool_calls"), // JSON
 		createdAt: text("created_at").notNull(),
 	},
 	(table) => [
@@ -168,6 +169,7 @@ export const cacheEntries = sqliteTable(
 		createdAt: text("created_at").notNull(),
 		expiresAt: text("expires_at"),
 		hits: integer("hits").notNull().default(0),
+		toolCalls: text("tool_calls"), // JSON
 	},
 	(table) => [
 		uniqueIndex("idx_cache_entries_key").on(table.cacheKey),

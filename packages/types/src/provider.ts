@@ -9,6 +9,32 @@ export interface ResponseFormatJsonObject {
 
 export type ResponseFormat = ResponseFormatJsonObject;
 
+export interface ToolFunction {
+	name: string;
+	description?: string;
+	parameters?: Record<string, unknown>;
+}
+
+export interface ToolDefinition {
+	type: "function";
+	function: ToolFunction;
+}
+
+export interface ToolCall {
+	id: string;
+	type: "function";
+	function: {
+		name: string;
+		arguments: string;
+	};
+}
+
+export type ToolChoice =
+	| "auto"
+	| "required"
+	| "none"
+	| { type: "function"; function: { name: string } };
+
 export interface ProviderConfig {
 	type: ProviderType;
 	name: string;
@@ -23,6 +49,8 @@ export interface ProviderConfig {
 	presencePenalty?: number;
 	stopSequences?: string[];
 	responseFormat?: ResponseFormat;
+	tools?: ToolDefinition[];
+	toolChoice?: ToolChoice;
 	timeoutMs?: number;
 	extra?: Record<string, unknown>;
 }
@@ -42,6 +70,7 @@ export interface ProviderResponse {
 	output: string;
 	latencyMs: number;
 	tokenUsage: TokenUsage;
+	toolCalls?: ToolCall[];
 	rawResponse?: unknown;
 	error?: string;
 }
@@ -58,6 +87,8 @@ export interface IProvider {
 	readonly model: string;
 	readonly systemMessage?: string;
 	readonly responseFormat?: ResponseFormat;
+	readonly tools?: ToolDefinition[];
+	readonly toolChoice?: ToolChoice;
 
 	generate(
 		input: string | ChatMessage[],

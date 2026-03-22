@@ -1020,7 +1020,7 @@ describe("Schema Migration", () => {
 		const version = rawDb.get(`SELECT version FROM schema_migrations LIMIT 1`) as {
 			version: number;
 		};
-		expect(version.version).toBe(2);
+		expect(version.version).toBe(3);
 
 		// Verify data survived migration
 		const projects = rawDb.all(`SELECT * FROM projects`);
@@ -1063,7 +1063,7 @@ describe("Schema Migration", () => {
 		const version = rawDb.get(`SELECT version FROM schema_migrations LIMIT 1`) as {
 			version: number;
 		};
-		expect(version.version).toBe(2);
+		expect(version.version).toBe(3);
 	});
 });
 

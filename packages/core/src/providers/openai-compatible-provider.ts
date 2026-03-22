@@ -1,4 +1,10 @@
-import type { ChatMessage, ProviderConfig, ProviderResponse, ProviderType } from "@llmbench/types";
+import type {
+	ChatMessage,
+	ProviderConfig,
+	ProviderResponse,
+	ProviderType,
+	ToolCall,
+} from "@llmbench/types";
 import { BaseProvider } from "./base-provider.js";
 
 /** HTTP status codes that are worth retrying */
@@ -69,6 +75,8 @@ export abstract class OpenAICompatibleProvider extends BaseProvider {
 			if (cfg.presencePenalty != null) body.presence_penalty = cfg.presencePenalty;
 			if (cfg.stopSequences != null) body.stop = cfg.stopSequences;
 			if (cfg.responseFormat) body.response_format = { type: cfg.responseFormat.type };
+			if (cfg.tools?.length) body.tools = cfg.tools;
+			if (cfg.toolChoice != null) body.tool_choice = cfg.toolChoice;
 
 			const response = await fetch(this.buildEndpointUrl(), {
 				method: "POST",
@@ -99,8 +107,23 @@ export abstract class OpenAICompatibleProvider extends BaseProvider {
 
 			const choices = data.choices as Array<Record<string, unknown>> | undefined;
 			const message = choices?.[0]?.message as Record<string, unknown> | undefined;
-			const output = (message?.content as string) ?? "";
+			const textContent = (message?.content as string) ?? "";
 			const usage = (data.usage ?? {}) as Record<string, number>;
+
+			// Extract tool calls if present
+			const rawToolCalls = message?.tool_calls as
+				| Array<{ id: string; type: string; function: { name: string; arguments: string } }>
+				| undefined;
+			let toolCalls: ToolCall[] | undefined;
+			if (rawToolCalls?.length) {
+				toolCalls = rawToolCalls.map((tc) => ({
+					id: tc.id,
+					type: "function" as const,
+					function: { name: tc.function.name, arguments: tc.function.arguments },
+				}));
+			}
+
+			const output = textContent || (toolCalls ? JSON.stringify(toolCalls) : "");
 
 			return {
 				output,
@@ -110,6 +133,7 @@ export abstract class OpenAICompatibleProvider extends BaseProvider {
 					outputTokens: usage.completion_tokens ?? 0,
 					totalTokens: usage.total_tokens ?? 0,
 				},
+				toolCalls,
 			};
 		} catch (error) {
 			const latencyMs = Date.now() - startTime;

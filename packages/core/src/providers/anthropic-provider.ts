@@ -1,4 +1,4 @@
-import type { ChatMessage, ProviderConfig, ProviderResponse } from "@llmbench/types";
+import type { ChatMessage, ProviderConfig, ProviderResponse, ToolCall } from "@llmbench/types";
 import { BaseProvider } from "./base-provider.js";
 
 export class AnthropicProvider extends BaseProvider {
@@ -52,6 +52,21 @@ export class AnthropicProvider extends BaseProvider {
 			if (systemText) {
 				body.system = systemText;
 			}
+			if (cfg.tools?.length) {
+				body.tools = cfg.tools.map((t) => ({
+					name: t.function.name,
+					description: t.function.description,
+					input_schema: t.function.parameters ?? { type: "object" },
+				}));
+			}
+			if (cfg.toolChoice != null) {
+				if (cfg.toolChoice === "auto") body.tool_choice = { type: "auto" };
+				else if (cfg.toolChoice === "required") body.tool_choice = { type: "any" };
+				else if (cfg.toolChoice === "none") {
+					// Omit tools entirely for "none"
+					delete body.tools;
+				} else body.tool_choice = { type: "tool", name: cfg.toolChoice.function.name };
+			}
 
 			const response = await fetch(`${this.baseUrl}/messages`, {
 				method: "POST",
@@ -77,13 +92,30 @@ export class AnthropicProvider extends BaseProvider {
 				};
 			}
 
-			const content = data.content as Array<{ type: string; text?: string }> | undefined;
-			const output =
+			const content = data.content as
+				| Array<{ type: string; text?: string; id?: string; name?: string; input?: unknown }>
+				| undefined;
+			const textContent =
 				content
 					?.filter((b) => b.type === "text")
 					.map((b) => b.text ?? "")
 					.join("") ?? "";
 
+			// Extract tool calls
+			const toolUseBlocks = content?.filter((b) => b.type === "tool_use") ?? [];
+			let toolCalls: ToolCall[] | undefined;
+			if (toolUseBlocks.length > 0) {
+				toolCalls = toolUseBlocks.map((b) => ({
+					id: b.id ?? "",
+					type: "function" as const,
+					function: {
+						name: b.name ?? "",
+						arguments: JSON.stringify(b.input ?? {}),
+					},
+				}));
+			}
+
+			const output = textContent || (toolCalls ? JSON.stringify(toolCalls) : "");
 			const usage = (data.usage ?? {}) as Record<string, number>;
 
 			return {
@@ -94,6 +126,7 @@ export class AnthropicProvider extends BaseProvider {
 					outputTokens: usage.output_tokens ?? 0,
 					totalTokens: (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0),
 				},
+				toolCalls,
 			};
 		} catch (error) {
 			const latencyMs = Date.now() - startTime;

@@ -21,6 +21,7 @@ export class EvalResultRepository {
 		outputTokens: number;
 		totalTokens: number;
 		cost?: number;
+		toolCalls?: unknown;
 		rawResponse?: unknown;
 	}): Promise<EvalResult> {
 		const now = new Date().toISOString();
@@ -38,6 +39,7 @@ export class EvalResultRepository {
 			outputTokens: data.outputTokens,
 			totalTokens: data.totalTokens,
 			cost: data.cost ?? null,
+			toolCalls: data.toolCalls ? JSON.stringify(data.toolCalls) : null,
 			rawResponse: data.rawResponse ? JSON.stringify(data.rawResponse) : null,
 			createdAt: now,
 		};
@@ -60,6 +62,7 @@ export class EvalResultRepository {
 				totalTokens: record.totalTokens,
 			},
 			cost: record.cost ?? undefined,
+			toolCalls: data.toolCalls as EvalResult["toolCalls"],
 			rawResponse: data.rawResponse,
 			createdAt: record.createdAt,
 		};
@@ -102,6 +105,7 @@ export class EvalResultRepository {
 				totalTokens: row.totalTokens,
 			},
 			cost: row.cost ?? undefined,
+			toolCalls: row.toolCalls ? JSON.parse(row.toolCalls) : undefined,
 			rawResponse: row.rawResponse ? JSON.parse(row.rawResponse) : undefined,
 			createdAt: row.createdAt,
 		};

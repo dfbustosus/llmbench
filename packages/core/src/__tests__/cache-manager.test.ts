@@ -167,6 +167,24 @@ describe("CacheManager", () => {
 			});
 			expect(key1).toBe(key2);
 		});
+
+		it("should produce different keys when tools differ", () => {
+			const tools = [
+				{
+					type: "function" as const,
+					function: { name: "get_weather", parameters: { type: "object" } },
+				},
+			];
+			const key1 = cache.computeKey("p1", "gpt-4", "Hello", { temperature: 0.7 });
+			const key2 = cache.computeKey("p1", "gpt-4", "Hello", { temperature: 0.7, tools });
+			expect(key1).not.toBe(key2);
+		});
+
+		it("should produce different keys when toolChoice differs", () => {
+			const key1 = cache.computeKey("p1", "gpt-4", "Hello", { toolChoice: "auto" });
+			const key2 = cache.computeKey("p1", "gpt-4", "Hello", { toolChoice: "required" });
+			expect(key1).not.toBe(key2);
+		});
 	});
 
 	describe("get/set", () => {

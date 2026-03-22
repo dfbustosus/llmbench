@@ -1,4 +1,4 @@
-import type { ChatMessage, ProviderConfig, ProviderResponse } from "@llmbench/types";
+import type { ChatMessage, ProviderConfig, ProviderResponse, ToolCall } from "@llmbench/types";
 import { AwsClient } from "aws4fetch";
 import { BaseProvider } from "./base-provider.js";
 
@@ -98,6 +98,23 @@ export class BedrockProvider extends BaseProvider {
 			if (Object.keys(inferenceConfig).length > 0) {
 				body.inferenceConfig = inferenceConfig;
 			}
+			if (cfg.tools?.length && cfg.toolChoice !== "none") {
+				const toolConfig: Record<string, unknown> = {
+					tools: cfg.tools.map((t) => ({
+						toolSpec: {
+							name: t.function.name,
+							description: t.function.description,
+							inputSchema: { json: t.function.parameters ?? { type: "object" } },
+						},
+					})),
+				};
+				if (cfg.toolChoice != null) {
+					if (cfg.toolChoice === "auto") toolConfig.toolChoice = { auto: {} };
+					else if (cfg.toolChoice === "required") toolConfig.toolChoice = { any: {} };
+					else toolConfig.toolChoice = { tool: { name: cfg.toolChoice.function.name } };
+				}
+				body.toolConfig = toolConfig;
+			}
 
 			const url = `https://bedrock-runtime.${this.region}.amazonaws.com/model/${encodeURIComponent(cfg.model)}/converse`;
 
@@ -127,12 +144,40 @@ export class BedrockProvider extends BaseProvider {
 				};
 			}
 
-			// Converse response: output.message.content[0].text
+			// Converse response: output.message.content[0].text or toolUse
 			const outputMsg = data.output as Record<string, unknown> | undefined;
 			const message = outputMsg?.message as Record<string, unknown> | undefined;
-			const contentBlocks = message?.content as Array<{ text?: string }> | undefined;
-			const output = contentBlocks?.map((b) => b.text ?? "").join("") ?? "";
+			const contentBlocks = message?.content as
+				| Array<{
+						text?: string;
+						toolUse?: { toolUseId: string; name: string; input: unknown };
+				  }>
+				| undefined;
 
+			const textContent =
+				contentBlocks
+					?.filter((b) => b.text != null)
+					.map((b) => b.text ?? "")
+					.join("") ?? "";
+
+			// Extract tool calls
+			const toolUseBlocks = contentBlocks?.filter((b) => b.toolUse != null) ?? [];
+			let toolCalls: ToolCall[] | undefined;
+			if (toolUseBlocks.length > 0) {
+				toolCalls = toolUseBlocks.map((b) => {
+					const tu = b.toolUse;
+					return {
+						id: tu?.toolUseId ?? "",
+						type: "function" as const,
+						function: {
+							name: tu?.name ?? "",
+							arguments: JSON.stringify(tu?.input ?? {}),
+						},
+					};
+				});
+			}
+
+			const output = textContent || (toolCalls ? JSON.stringify(toolCalls) : "");
 			const usage = (data.usage ?? {}) as Record<string, number>;
 
 			return {
@@ -143,6 +188,7 @@ export class BedrockProvider extends BaseProvider {
 					outputTokens: usage.outputTokens ?? 0,
 					totalTokens: (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
 				},
+				toolCalls,
 			};
 		} catch (error) {
 			const latencyMs = Date.now() - startTime;

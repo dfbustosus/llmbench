@@ -20,4 +20,5 @@ export interface CacheEntry {
 	createdAt: string;
 	expiresAt?: string;
 	hits: number;
+	toolCalls?: string;
 }

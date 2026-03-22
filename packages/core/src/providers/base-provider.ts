@@ -5,6 +5,8 @@ import type {
 	ProviderResponse,
 	ProviderType,
 	ResponseFormat,
+	ToolChoice,
+	ToolDefinition,
 } from "@llmbench/types";
 
 export abstract class BaseProvider implements IProvider {
@@ -13,6 +15,8 @@ export abstract class BaseProvider implements IProvider {
 	readonly model: string;
 	readonly systemMessage?: string;
 	readonly responseFormat?: ResponseFormat;
+	readonly tools?: ToolDefinition[];
+	readonly toolChoice?: ToolChoice;
 	protected config: ProviderConfig;
 
 	constructor(config: ProviderConfig) {
@@ -25,6 +29,8 @@ export abstract class BaseProvider implements IProvider {
 		this.model = config.model;
 		this.systemMessage = config.systemMessage;
 		this.responseFormat = config.responseFormat;
+		this.tools = config.tools;
+		this.toolChoice = config.toolChoice;
 		this.config = config;
 	}
 
