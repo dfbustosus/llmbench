@@ -68,6 +68,7 @@ export abstract class OpenAICompatibleProvider extends BaseProvider {
 			if (cfg.frequencyPenalty != null) body.frequency_penalty = cfg.frequencyPenalty;
 			if (cfg.presencePenalty != null) body.presence_penalty = cfg.presencePenalty;
 			if (cfg.stopSequences != null) body.stop = cfg.stopSequences;
+			if (cfg.responseFormat) body.response_format = { type: cfg.responseFormat.type };
 
 			const response = await fetch(this.buildEndpointUrl(), {
 				method: "POST",
