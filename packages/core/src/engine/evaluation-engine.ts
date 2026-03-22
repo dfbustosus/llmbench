@@ -167,6 +167,14 @@ export class EvaluationEngine {
 							};
 						}
 
+						// Include tools config in overrides for cache key differentiation
+						if (provider.tools) {
+							configOverrides = { ...configOverrides, tools: provider.tools };
+						}
+						if (provider.toolChoice) {
+							configOverrides = { ...configOverrides, toolChoice: provider.toolChoice };
+						}
+
 						// Check cache before calling provider
 						let response: ProviderResponse;
 						let cached = false;
@@ -228,6 +236,7 @@ export class EvaluationEngine {
 							outputTokens: response.tokenUsage.outputTokens,
 							totalTokens: response.tokenUsage.totalTokens,
 							cost: cost.totalCost,
+							toolCalls: response.toolCalls,
 						});
 
 						// Run scorers (pre-created from assertions or global scorers)
