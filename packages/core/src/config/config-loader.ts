@@ -141,6 +141,15 @@ function validateProviderConfig(
 	if (typeof p.model !== "string" || !p.model) {
 		throw new Error(`providers[${index}].model must be a non-empty string`);
 	}
+	if (p.responseFormat !== undefined) {
+		if (!p.responseFormat || typeof p.responseFormat !== "object") {
+			throw new Error(`providers[${index}].responseFormat must be an object`);
+		}
+		const rf = p.responseFormat as Record<string, unknown>;
+		if (rf.type !== "json_object") {
+			throw new Error(`providers[${index}].responseFormat.type must be "json_object"`);
+		}
+	}
 }
 
 function validateScorerConfig(scorer: unknown, index: number): asserts scorer is ScorerConfig {
