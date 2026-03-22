@@ -150,6 +150,44 @@ function validateProviderConfig(
 			throw new Error(`providers[${index}].responseFormat.type must be "json_object"`);
 		}
 	}
+	if (p.tools !== undefined) {
+		if (!Array.isArray(p.tools)) {
+			throw new Error(`providers[${index}].tools must be an array`);
+		}
+		for (let ti = 0; ti < p.tools.length; ti++) {
+			const tool = p.tools[ti] as Record<string, unknown>;
+			if (tool.type !== "function") {
+				throw new Error(`providers[${index}].tools[${ti}].type must be "function"`);
+			}
+			const fn = tool.function as Record<string, unknown> | undefined;
+			if (!fn || typeof fn.name !== "string" || !fn.name) {
+				throw new Error(
+					`providers[${index}].tools[${ti}].function.name must be a non-empty string`,
+				);
+			}
+		}
+	}
+	if (p.toolChoice !== undefined) {
+		const valid = ["auto", "required", "none"];
+		if (typeof p.toolChoice === "string") {
+			if (!valid.includes(p.toolChoice)) {
+				throw new Error(
+					`providers[${index}].toolChoice must be "auto", "required", "none", or an object`,
+				);
+			}
+		} else if (typeof p.toolChoice === "object" && p.toolChoice !== null) {
+			const tc = p.toolChoice as Record<string, unknown>;
+			if (tc.type !== "function") {
+				throw new Error(`providers[${index}].toolChoice.type must be "function"`);
+			}
+			const fn = tc.function as Record<string, unknown> | undefined;
+			if (!fn || typeof fn.name !== "string" || !fn.name) {
+				throw new Error(`providers[${index}].toolChoice.function.name must be a non-empty string`);
+			}
+		} else {
+			throw new Error(`providers[${index}].toolChoice must be a string or object`);
+		}
+	}
 }
 
 function validateScorerConfig(scorer: unknown, index: number): asserts scorer is ScorerConfig {
