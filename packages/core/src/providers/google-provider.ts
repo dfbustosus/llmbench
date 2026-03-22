@@ -32,14 +32,19 @@ export class GoogleProvider extends BaseProvider {
 				parts: [{ text: m.content }],
 			}));
 
+			const generationConfig: Record<string, unknown> = {
+				temperature: cfg.temperature ?? 0,
+				maxOutputTokens: cfg.maxTokens,
+				topP: cfg.topP,
+				stopSequences: cfg.stopSequences,
+			};
+			if (cfg.responseFormat?.type === "json_object") {
+				generationConfig.responseMimeType = "application/json";
+			}
+
 			const body: Record<string, unknown> = {
 				contents,
-				generationConfig: {
-					temperature: cfg.temperature ?? 0,
-					maxOutputTokens: cfg.maxTokens,
-					topP: cfg.topP,
-					stopSequences: cfg.stopSequences,
-				},
+				generationConfig,
 			};
 
 			if (systemText) {
