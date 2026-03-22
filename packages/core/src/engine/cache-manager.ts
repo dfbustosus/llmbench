@@ -30,6 +30,8 @@ export class CacheManager {
 			stopSequences: config?.stopSequences,
 			systemMessage: config?.systemMessage,
 			responseFormat: config?.responseFormat,
+			tools: config?.tools,
+			toolChoice: config?.toolChoice,
 		};
 
 		return createHash("sha256").update(JSON.stringify(keyData)).digest("hex");
@@ -57,6 +59,7 @@ export class CacheManager {
 			output: entry.output,
 			latencyMs: 0,
 			tokenUsage: entry.tokenUsage ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+			toolCalls: entry.toolCalls ? JSON.parse(entry.toolCalls) : undefined,
 		};
 	}
 
@@ -87,6 +90,7 @@ export class CacheManager {
 				tokenUsage: response.tokenUsage,
 				latencyMs: response.latencyMs,
 				expiresAt,
+				toolCalls: response.toolCalls ? JSON.stringify(response.toolCalls) : undefined,
 			});
 		} catch {
 			// Ignore duplicate key errors from concurrent inserts
