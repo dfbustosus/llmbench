@@ -234,4 +234,74 @@ describe("validateConfig", () => {
 		};
 		expect(() => validateConfig(config)).toThrow("responseFormat must be an object");
 	});
+
+	it("should accept a provider with tools", () => {
+		const config = {
+			projectName: "test",
+			providers: [
+				{
+					type: "openai",
+					name: "GPT",
+					model: "gpt-4o",
+					tools: [
+						{
+							type: "function",
+							function: { name: "get_weather", description: "Get weather" },
+						},
+					],
+					toolChoice: "auto",
+				},
+			],
+			scorers: [{ id: "exact-match", name: "Exact Match", type: "exact-match" }],
+		};
+		expect(() => validateConfig(config)).not.toThrow();
+	});
+
+	it("should reject tools with missing function name", () => {
+		const config = {
+			projectName: "test",
+			providers: [
+				{
+					type: "openai",
+					name: "GPT",
+					model: "gpt-4o",
+					tools: [{ type: "function", function: { name: "" } }],
+				},
+			],
+			scorers: [{ id: "exact-match", name: "Exact Match", type: "exact-match" }],
+		};
+		expect(() => validateConfig(config)).toThrow("function.name must be a non-empty string");
+	});
+
+	it("should reject invalid toolChoice string", () => {
+		const config = {
+			projectName: "test",
+			providers: [
+				{
+					type: "openai",
+					name: "GPT",
+					model: "gpt-4o",
+					toolChoice: "invalid",
+				},
+			],
+			scorers: [{ id: "exact-match", name: "Exact Match", type: "exact-match" }],
+		};
+		expect(() => validateConfig(config)).toThrow("toolChoice");
+	});
+
+	it("should accept toolChoice as specific function", () => {
+		const config = {
+			projectName: "test",
+			providers: [
+				{
+					type: "openai",
+					name: "GPT",
+					model: "gpt-4o",
+					toolChoice: { type: "function", function: { name: "get_weather" } },
+				},
+			],
+			scorers: [{ id: "exact-match", name: "Exact Match", type: "exact-match" }],
+		};
+		expect(() => validateConfig(config)).not.toThrow();
+	});
 });
