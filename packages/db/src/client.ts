@@ -23,7 +23,7 @@ export function createInMemoryDB() {
 	return db;
 }
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 export function initializeDB(db: LLMBenchDB) {
 	// 1. Create schema_migrations table
@@ -147,6 +147,7 @@ function createTables(db: LLMBenchDB) {
 			total_tokens INTEGER NOT NULL DEFAULT 0,
 			cost REAL,
 			raw_response TEXT,
+			tool_calls TEXT,
 			created_at TEXT NOT NULL
 		)
 	`);
@@ -192,7 +193,8 @@ function createTables(db: LLMBenchDB) {
 			latency_ms REAL,
 			created_at TEXT NOT NULL,
 			expires_at TEXT,
-			hits INTEGER NOT NULL DEFAULT 0
+			hits INTEGER NOT NULL DEFAULT 0,
+			tool_calls TEXT
 		)
 	`);
 
@@ -313,6 +315,9 @@ function runMigrations(db: LLMBenchDB, fromVersion: number) {
 	}
 	if (fromVersion < 2) {
 		migrateToV2(db);
+	}
+	if (fromVersion < 3) {
+		migrateToV3(db);
 	}
 }
 
@@ -450,4 +455,14 @@ function migrateToV2(db: LLMBenchDB) {
 	// handled by createUniqueIndexes() which runs for every init, so we
 	// only need to ensure the indexes are present.
 	createUniqueIndexes(db);
+}
+
+function migrateToV3(db: LLMBenchDB) {
+	// V3 adds tool_calls columns for tool/function calling support
+	if (!columnExists(db, "eval_results", "tool_calls")) {
+		db.run(`ALTER TABLE eval_results ADD COLUMN tool_calls TEXT`);
+	}
+	if (!columnExists(db, "cache_entries", "tool_calls")) {
+		db.run(`ALTER TABLE cache_entries ADD COLUMN tool_calls TEXT`);
+	}
 }
