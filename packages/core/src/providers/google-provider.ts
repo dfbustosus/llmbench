@@ -1,4 +1,4 @@
-import type { ChatMessage, ProviderConfig, ProviderResponse } from "@llmbench/types";
+import type { ChatMessage, ProviderConfig, ProviderResponse, ToolCall } from "@llmbench/types";
 import { BaseProvider } from "./base-provider.js";
 
 export class GoogleProvider extends BaseProvider {
@@ -50,6 +50,36 @@ export class GoogleProvider extends BaseProvider {
 			if (systemText) {
 				body.systemInstruction = { parts: [{ text: systemText }] };
 			}
+			if (cfg.tools?.length) {
+				body.tools = [
+					{
+						functionDeclarations: cfg.tools.map((t) => ({
+							name: t.function.name,
+							description: t.function.description,
+							parameters: t.function.parameters,
+						})),
+					},
+				];
+			}
+			if (cfg.toolChoice != null) {
+				const mode =
+					cfg.toolChoice === "auto"
+						? "AUTO"
+						: cfg.toolChoice === "required"
+							? "ANY"
+							: cfg.toolChoice === "none"
+								? "NONE"
+								: "ANY";
+				const toolConfig: Record<string, unknown> = {
+					function_calling_config: { mode },
+				};
+				if (typeof cfg.toolChoice === "object") {
+					(toolConfig.function_calling_config as Record<string, unknown>).allowed_function_names = [
+						cfg.toolChoice.function.name,
+					];
+				}
+				body.tool_config = toolConfig;
+			}
 
 			const url = `${this.baseUrl}/models/${cfg.model}:generateContent`;
 			const response = await fetch(url, {
@@ -77,10 +107,33 @@ export class GoogleProvider extends BaseProvider {
 
 			const candidates = data.candidates as Array<Record<string, unknown>> | undefined;
 			const parts = (candidates?.[0]?.content as Record<string, unknown>)?.parts as
-				| Array<{ text?: string }>
+				| Array<{ text?: string; functionCall?: { name: string; args: unknown } }>
 				| undefined;
-			const output = parts?.map((p) => p.text ?? "").join("") ?? "";
 
+			const textContent =
+				parts
+					?.filter((p) => p.text != null)
+					.map((p) => p.text ?? "")
+					.join("") ?? "";
+
+			// Extract function calls
+			const fnCallParts = parts?.filter((p) => p.functionCall != null) ?? [];
+			let toolCalls: ToolCall[] | undefined;
+			if (fnCallParts.length > 0) {
+				toolCalls = fnCallParts.map((p, i) => {
+					const fc = p.functionCall;
+					return {
+						id: `google-tc-${i}`,
+						type: "function" as const,
+						function: {
+							name: fc?.name ?? "",
+							arguments: JSON.stringify(fc?.args ?? {}),
+						},
+					};
+				});
+			}
+
+			const output = textContent || (toolCalls ? JSON.stringify(toolCalls) : "");
 			const usage = (data.usageMetadata ?? {}) as Record<string, number>;
 
 			return {
@@ -91,6 +144,7 @@ export class GoogleProvider extends BaseProvider {
 					outputTokens: usage.candidatesTokenCount ?? 0,
 					totalTokens: usage.totalTokenCount ?? 0,
 				},
+				toolCalls,
 			};
 		} catch (error) {
 			const latencyMs = Date.now() - startTime;
