@@ -29,6 +29,7 @@ export class CacheManager {
 			presencePenalty: config?.presencePenalty,
 			stopSequences: config?.stopSequences,
 			systemMessage: config?.systemMessage,
+			responseFormat: config?.responseFormat,
 		};
 
 		return createHash("sha256").update(JSON.stringify(keyData)).digest("hex");
