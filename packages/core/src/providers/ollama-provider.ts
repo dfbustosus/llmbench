@@ -19,21 +19,26 @@ export class OllamaProvider extends BaseProvider {
 		try {
 			const messages = this.buildMessages(input, overrides);
 
+			const requestBody: Record<string, unknown> = {
+				model: cfg.model,
+				messages,
+				stream: false,
+				options: {
+					temperature: cfg.temperature ?? 0,
+					num_predict: cfg.maxTokens,
+					top_p: cfg.topP,
+					stop: cfg.stopSequences,
+				},
+			};
+			if (cfg.responseFormat?.type === "json_object") {
+				requestBody.format = "json";
+			}
+
 			const response = await fetch(`${this.baseUrl}/api/chat`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				signal: this.createTimeoutSignal(cfg.timeoutMs),
-				body: JSON.stringify({
-					model: cfg.model,
-					messages,
-					stream: false,
-					options: {
-						temperature: cfg.temperature ?? 0,
-						num_predict: cfg.maxTokens,
-						top_p: cfg.topP,
-						stop: cfg.stopSequences,
-					},
-				}),
+				body: JSON.stringify(requestBody),
 			});
 
 			const data = (await response.json()) as Record<string, unknown>;
