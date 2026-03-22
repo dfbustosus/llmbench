@@ -4,6 +4,7 @@ import type {
 	ProviderConfig,
 	ProviderResponse,
 	ProviderType,
+	ResponseFormat,
 } from "@llmbench/types";
 
 export abstract class BaseProvider implements IProvider {
@@ -11,6 +12,7 @@ export abstract class BaseProvider implements IProvider {
 	readonly name: string;
 	readonly model: string;
 	readonly systemMessage?: string;
+	readonly responseFormat?: ResponseFormat;
 	protected config: ProviderConfig;
 
 	constructor(config: ProviderConfig) {
@@ -22,6 +24,7 @@ export abstract class BaseProvider implements IProvider {
 		this.name = config.name;
 		this.model = config.model;
 		this.systemMessage = config.systemMessage;
+		this.responseFormat = config.responseFormat;
 		this.config = config;
 	}
 
