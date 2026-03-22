@@ -3,6 +3,12 @@ export interface ChatMessage {
 	content: string;
 }
 
+export interface ResponseFormatJsonObject {
+	type: "json_object";
+}
+
+export type ResponseFormat = ResponseFormatJsonObject;
+
 export interface ProviderConfig {
 	type: ProviderType;
 	name: string;
@@ -16,6 +22,7 @@ export interface ProviderConfig {
 	frequencyPenalty?: number;
 	presencePenalty?: number;
 	stopSequences?: string[];
+	responseFormat?: ResponseFormat;
 	timeoutMs?: number;
 	extra?: Record<string, unknown>;
 }
@@ -50,6 +57,7 @@ export interface IProvider {
 	readonly name: string;
 	readonly model: string;
 	readonly systemMessage?: string;
+	readonly responseFormat?: ResponseFormat;
 
 	generate(
 		input: string | ChatMessage[],

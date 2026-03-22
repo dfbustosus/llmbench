@@ -159,6 +159,14 @@ export class EvaluationEngine {
 							};
 						}
 
+						// Include responseFormat in config so it becomes part of the cache key
+						if (provider.responseFormat) {
+							configOverrides = {
+								...configOverrides,
+								responseFormat: provider.responseFormat,
+							};
+						}
+
 						// Check cache before calling provider
 						let response: ProviderResponse;
 						let cached = false;

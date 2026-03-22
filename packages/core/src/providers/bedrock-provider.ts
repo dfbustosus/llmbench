@@ -18,6 +18,7 @@ const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 export class BedrockProvider extends BaseProvider {
 	private awsClient: AwsClient;
 	private region: string;
+	private jsonModeWarned = false;
 
 	constructor(config: ProviderConfig) {
 		super({ ...config, type: "bedrock" });
@@ -68,6 +69,24 @@ export class BedrockProvider extends BaseProvider {
 
 			if (systemMessages.length > 0) {
 				body.system = systemMessages.map((m) => ({ text: m.content }));
+			}
+
+			if (cfg.responseFormat?.type === "json_object") {
+				if (!this.jsonModeWarned) {
+					console.warn(
+						"[llmbench] Bedrock Converse API does not natively support JSON mode. " +
+							"Adding system prompt instruction for JSON output.",
+					);
+					this.jsonModeWarned = true;
+				}
+				const jsonInstruction = {
+					text: "You must respond with valid JSON only. No markdown, no explanation, just valid JSON.",
+				};
+				if (body.system) {
+					(body.system as Array<{ text: string }>).push(jsonInstruction);
+				} else {
+					body.system = [jsonInstruction];
+				}
 			}
 
 			const inferenceConfig: Record<string, unknown> = {};

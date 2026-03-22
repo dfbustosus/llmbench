@@ -156,6 +156,7 @@ export const evalCommand = new Command("eval")
 	.option("-t, --temperature <n>", "Temperature (0-2)", Number.parseFloat)
 	.option("--max-tokens <n>", "Max output tokens", Number.parseInt)
 	.option("--json", "Output results as JSON")
+	.option("--json-mode", "Request JSON output from providers (response_format: json_object)")
 	.option("--no-save", "Don't persist results to database")
 	.option("-c, --config <path>", "Config file path")
 	.option("-o, --output <file>", "Export results to file (.json, .csv, .html)")
@@ -181,6 +182,7 @@ export const evalCommand = new Command("eval")
 				if (options.system) pc.systemMessage = options.system;
 				if (options.temperature !== undefined) pc.temperature = options.temperature;
 				if (options.maxTokens !== undefined) pc.maxTokens = options.maxTokens;
+				if (options.jsonMode) pc.responseFormat = { type: "json_object" };
 				return pc;
 			});
 

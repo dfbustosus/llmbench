@@ -148,6 +148,25 @@ describe("CacheManager", () => {
 			const key2 = cache.computeKey("p1", "gpt-4", "Hello", undefined);
 			expect(key1).toBe(key2);
 		});
+
+		it("should produce different keys when responseFormat differs", () => {
+			const key1 = cache.computeKey("p1", "gpt-4", "Hello", { temperature: 0.7 });
+			const key2 = cache.computeKey("p1", "gpt-4", "Hello", {
+				temperature: 0.7,
+				responseFormat: { type: "json_object" },
+			});
+			expect(key1).not.toBe(key2);
+		});
+
+		it("should produce same key for same responseFormat", () => {
+			const key1 = cache.computeKey("p1", "gpt-4", "Hello", {
+				responseFormat: { type: "json_object" },
+			});
+			const key2 = cache.computeKey("p1", "gpt-4", "Hello", {
+				responseFormat: { type: "json_object" },
+			});
+			expect(key1).toBe(key2);
+		});
 	});
 
 	describe("get/set", () => {

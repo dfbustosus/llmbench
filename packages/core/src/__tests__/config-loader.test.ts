@@ -116,6 +116,26 @@ scorers:
 		await expect(loadConfig(filePath)).rejects.toThrow("type must be one of");
 	});
 
+	it("should load YAML config with responseFormat", async () => {
+		const yaml = `
+projectName: json-mode
+providers:
+  - type: openai
+    name: GPT JSON
+    model: gpt-4o
+    responseFormat:
+      type: json_object
+scorers:
+  - id: json-match
+    name: JSON Match
+    type: json-match
+`;
+		const filePath = writeTmpFile("json-mode.yaml", yaml);
+		const config = await loadConfig(filePath);
+
+		expect(config.providers[0].responseFormat).toEqual({ type: "json_object" });
+	});
+
 	it("should load YAML config with gate and cache sections", async () => {
 		const yaml = `
 projectName: full-config
@@ -165,5 +185,53 @@ describe("validateConfig", () => {
 			scorers: [],
 		};
 		expect(() => validateConfig(config)).toThrow("at least one scorer");
+	});
+
+	it("should accept a provider with responseFormat", () => {
+		const config = {
+			projectName: "test",
+			providers: [
+				{
+					type: "openai",
+					name: "GPT",
+					model: "gpt-4o",
+					responseFormat: { type: "json_object" },
+				},
+			],
+			scorers: [{ id: "exact-match", name: "Exact Match", type: "exact-match" }],
+		};
+		expect(() => validateConfig(config)).not.toThrow();
+	});
+
+	it("should reject invalid responseFormat type", () => {
+		const config = {
+			projectName: "test",
+			providers: [
+				{
+					type: "openai",
+					name: "GPT",
+					model: "gpt-4o",
+					responseFormat: { type: "invalid" },
+				},
+			],
+			scorers: [{ id: "exact-match", name: "Exact Match", type: "exact-match" }],
+		};
+		expect(() => validateConfig(config)).toThrow("responseFormat.type");
+	});
+
+	it("should reject non-object responseFormat", () => {
+		const config = {
+			projectName: "test",
+			providers: [
+				{
+					type: "openai",
+					name: "GPT",
+					model: "gpt-4o",
+					responseFormat: "json",
+				},
+			],
+			scorers: [{ id: "exact-match", name: "Exact Match", type: "exact-match" }],
+		};
+		expect(() => validateConfig(config)).toThrow("responseFormat must be an object");
 	});
 });
