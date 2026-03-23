@@ -232,6 +232,7 @@ export class EvaluationEngine {
 							output: response.output,
 							expected: testCase.expected,
 							latencyMs: response.latencyMs,
+							timeToFirstTokenMs: response.timeToFirstTokenMs,
 							inputTokens: response.tokenUsage.inputTokens,
 							outputTokens: response.tokenUsage.outputTokens,
 							totalTokens: response.tokenUsage.totalTokens,
@@ -274,6 +275,7 @@ export class EvaluationEngine {
 							testCaseId: testCase.id,
 							providerId,
 							latencyMs: response.latencyMs,
+							timeToFirstTokenMs: response.timeToFirstTokenMs,
 							cached,
 							scores: scores.map((s) => ({
 								scorerName: s.scorerName,
