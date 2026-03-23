@@ -51,6 +51,7 @@ export interface ProviderConfig {
 	responseFormat?: ResponseFormat;
 	tools?: ToolDefinition[];
 	toolChoice?: ToolChoice;
+	stream?: boolean;
 	timeoutMs?: number;
 	extra?: Record<string, unknown>;
 }
@@ -69,6 +70,7 @@ export type ProviderType =
 export interface ProviderResponse {
 	output: string;
 	latencyMs: number;
+	timeToFirstTokenMs?: number;
 	tokenUsage: TokenUsage;
 	toolCalls?: ToolCall[];
 	rawResponse?: unknown;
