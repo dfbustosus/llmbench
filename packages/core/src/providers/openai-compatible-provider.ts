@@ -3,9 +3,11 @@ import type {
 	ProviderConfig,
 	ProviderResponse,
 	ProviderType,
+	TokenUsage,
 	ToolCall,
 } from "@llmbench/types";
 import { BaseProvider } from "./base-provider.js";
+import { parseSSE } from "./streaming/sse-parser.js";
 
 /** HTTP status codes that are worth retrying */
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
@@ -58,6 +60,12 @@ export abstract class OpenAICompatibleProvider extends BaseProvider {
 		overrides?: Partial<ProviderConfig>,
 	): Promise<ProviderResponse> {
 		const cfg = this.mergeConfig(overrides);
+
+		// Delegate to streaming path when enabled (fall back for tool calls)
+		if (cfg.stream === true && !cfg.tools?.length) {
+			return this.generateStreaming(input, cfg, overrides);
+		}
+
 		const startTime = Date.now();
 
 		try {
@@ -144,6 +152,110 @@ export abstract class OpenAICompatibleProvider extends BaseProvider {
 				output: "",
 				latencyMs,
 				tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+				error: error instanceof Error ? error.message : String(error),
+			};
+		}
+	}
+
+	private async generateStreaming(
+		input: string | ChatMessage[],
+		cfg: ProviderConfig,
+		overrides?: Partial<ProviderConfig>,
+	): Promise<ProviderResponse> {
+		const startTime = Date.now();
+		let timeToFirstTokenMs: number | undefined;
+		const chunks: string[] = [];
+		let tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+
+		try {
+			const messages = this.buildMessages(input, overrides);
+
+			const body: Record<string, unknown> = {
+				model: cfg.model,
+				messages,
+				temperature: cfg.temperature ?? 0,
+				stream: true,
+				stream_options: { include_usage: true },
+			};
+
+			if (cfg.maxTokens != null) this.setMaxTokens(body, cfg.maxTokens);
+			if (cfg.topP != null) body.top_p = cfg.topP;
+			if (cfg.frequencyPenalty != null) body.frequency_penalty = cfg.frequencyPenalty;
+			if (cfg.presencePenalty != null) body.presence_penalty = cfg.presencePenalty;
+			if (cfg.stopSequences != null) body.stop = cfg.stopSequences;
+			if (cfg.responseFormat) body.response_format = { type: cfg.responseFormat.type };
+
+			const response = await fetch(this.buildEndpointUrl(), {
+				method: "POST",
+				headers: this.buildHeaders(),
+				body: JSON.stringify(body),
+				signal: this.createTimeoutSignal(cfg.timeoutMs),
+			});
+
+			if (!response.ok) {
+				const data = (await response.json()) as Record<string, unknown>;
+				const latencyMs = Date.now() - startTime;
+				const err = data.error as Record<string, unknown> | undefined;
+				const errorMsg =
+					(err?.message as string) || JSON.stringify(data) || `HTTP ${response.status}`;
+
+				if (RETRYABLE_STATUS_CODES.has(response.status)) {
+					throw new Error(`${this.providerLabel} API error (${response.status}): ${errorMsg}`);
+				}
+				return {
+					output: "",
+					latencyMs,
+					tokenUsage,
+					error: `${this.providerLabel} API error (${response.status}): ${errorMsg}`,
+				};
+			}
+
+			if (!response.body) {
+				throw new Error(`${this.providerLabel} streaming response has no body`);
+			}
+
+			for await (const event of parseSSE(response.body)) {
+				if (event.data === "[DONE]") break;
+
+				const parsed = JSON.parse(event.data) as Record<string, unknown>;
+				const choices = parsed.choices as Array<Record<string, unknown>> | undefined;
+				const delta = choices?.[0]?.delta as Record<string, unknown> | undefined;
+				const content = delta?.content as string | undefined;
+
+				if (content) {
+					if (timeToFirstTokenMs === undefined) {
+						timeToFirstTokenMs = Date.now() - startTime;
+					}
+					chunks.push(content);
+				}
+
+				// Extract usage from the final chunk (when stream_options.include_usage is set)
+				const usage = parsed.usage as Record<string, number> | undefined;
+				if (usage) {
+					tokenUsage = {
+						inputTokens: usage.prompt_tokens ?? 0,
+						outputTokens: usage.completion_tokens ?? 0,
+						totalTokens: usage.total_tokens ?? 0,
+					};
+				}
+			}
+
+			return {
+				output: chunks.join(""),
+				latencyMs: Date.now() - startTime,
+				timeToFirstTokenMs,
+				tokenUsage,
+			};
+		} catch (error) {
+			const latencyMs = Date.now() - startTime;
+			if (error instanceof Error && error.message.startsWith(`${this.providerLabel} API error`)) {
+				throw error;
+			}
+			return {
+				output: chunks.join(""),
+				latencyMs,
+				timeToFirstTokenMs,
+				tokenUsage,
 				error: error instanceof Error ? error.message : String(error),
 			};
 		}

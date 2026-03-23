@@ -17,6 +17,7 @@ export class EvalResultRepository {
 		expected: string;
 		error?: string;
 		latencyMs: number;
+		timeToFirstTokenMs?: number;
 		inputTokens: number;
 		outputTokens: number;
 		totalTokens: number;
@@ -35,6 +36,7 @@ export class EvalResultRepository {
 			expected: data.expected,
 			error: data.error ?? null,
 			latencyMs: data.latencyMs,
+			timeToFirstTokenMs: data.timeToFirstTokenMs ?? null,
 			inputTokens: data.inputTokens,
 			outputTokens: data.outputTokens,
 			totalTokens: data.totalTokens,
@@ -56,6 +58,7 @@ export class EvalResultRepository {
 			expected: record.expected,
 			error: record.error ?? undefined,
 			latencyMs: record.latencyMs,
+			timeToFirstTokenMs: data.timeToFirstTokenMs,
 			tokenUsage: {
 				inputTokens: record.inputTokens,
 				outputTokens: record.outputTokens,
@@ -99,6 +102,7 @@ export class EvalResultRepository {
 			expected: row.expected,
 			error: row.error ?? undefined,
 			latencyMs: row.latencyMs,
+			timeToFirstTokenMs: row.timeToFirstTokenMs ?? undefined,
 			tokenUsage: {
 				inputTokens: row.inputTokens,
 				outputTokens: row.outputTokens,

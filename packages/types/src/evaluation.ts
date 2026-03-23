@@ -47,6 +47,7 @@ export interface EvalResult {
 	expected: string;
 	error?: string;
 	latencyMs: number;
+	timeToFirstTokenMs?: number;
 	tokenUsage: {
 		inputTokens: number;
 		outputTokens: number;

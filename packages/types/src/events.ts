@@ -32,6 +32,7 @@ export interface CaseCompletedEvent {
 	testCaseId: string;
 	providerId: string;
 	latencyMs: number;
+	timeToFirstTokenMs?: number;
 	cached?: boolean;
 	scores: Array<{ scorerName: string; value: number }>;
 	timestamp: string;

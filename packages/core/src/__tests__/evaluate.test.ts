@@ -291,4 +291,23 @@ describe("evaluateQuick() SDK", () => {
 		expect(result.run.config.timeoutMs).toBe(5000);
 		expect(events.length).toBeGreaterThan(0);
 	});
+
+	it("should include timeToFirstTokenMs in results when provider returns it", async () => {
+		const streamingFn: CustomGenerateFn = async () => ({
+			output: "Paris",
+			latencyMs: 200,
+			timeToFirstTokenMs: 50,
+			tokenUsage: { inputTokens: 5, outputTokens: 3, totalTokens: 8 },
+		});
+
+		const result = await evaluate({
+			testCases: [{ input: "What is the capital of France?", expected: "Paris" }],
+			providers: [{ type: "custom", name: "StreamLLM", model: "stream-v1" }],
+			scorers: [{ id: "exact-match", name: "Exact Match", type: "exact-match" }],
+			customProviders: new Map([["StreamLLM", streamingFn]]),
+		});
+
+		expect(result.results).toHaveLength(1);
+		expect(result.results[0].result.timeToFirstTokenMs).toBe(50);
+	});
 });

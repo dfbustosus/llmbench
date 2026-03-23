@@ -1,6 +1,13 @@
-import type { ChatMessage, ProviderConfig, ProviderResponse, ToolCall } from "@llmbench/types";
+import type {
+	ChatMessage,
+	ProviderConfig,
+	ProviderResponse,
+	TokenUsage,
+	ToolCall,
+} from "@llmbench/types";
 import { AwsClient } from "aws4fetch";
 import { BaseProvider } from "./base-provider.js";
+import { parseBedrockEventStream } from "./streaming/bedrock-event-stream-parser.js";
 
 /** HTTP status codes that are worth retrying */
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
@@ -51,6 +58,11 @@ export class BedrockProvider extends BaseProvider {
 		overrides?: Partial<ProviderConfig>,
 	): Promise<ProviderResponse> {
 		const cfg = this.mergeConfig(overrides);
+
+		if (cfg.stream === true && !cfg.tools?.length) {
+			return this.generateStreaming(input, cfg, overrides);
+		}
+
 		const startTime = Date.now();
 
 		try {
@@ -199,6 +211,133 @@ export class BedrockProvider extends BaseProvider {
 				output: "",
 				latencyMs,
 				tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+				error: error instanceof Error ? error.message : String(error),
+			};
+		}
+	}
+
+	private async generateStreaming(
+		input: string | ChatMessage[],
+		cfg: ProviderConfig,
+		overrides?: Partial<ProviderConfig>,
+	): Promise<ProviderResponse> {
+		const startTime = Date.now();
+		let timeToFirstTokenMs: number | undefined;
+		const chunks: string[] = [];
+		let tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+
+		try {
+			const allMessages = this.buildMessages(input, overrides);
+			const systemMessages = allMessages.filter((m) => m.role === "system");
+			const conversationMessages = allMessages.filter((m) => m.role !== "system");
+
+			const body: Record<string, unknown> = {
+				messages: conversationMessages.map((m) => ({
+					role: m.role,
+					content: [{ text: m.content }],
+				})),
+			};
+
+			if (systemMessages.length > 0) {
+				body.system = systemMessages.map((m) => ({ text: m.content }));
+			}
+
+			if (cfg.responseFormat?.type === "json_object") {
+				if (!this.jsonModeWarned) {
+					console.warn(
+						"[llmbench] Bedrock Converse API does not natively support JSON mode. " +
+							"Adding system prompt instruction for JSON output.",
+					);
+					this.jsonModeWarned = true;
+				}
+				const jsonInstruction = {
+					text: "You must respond with valid JSON only. No markdown, no explanation, just valid JSON.",
+				};
+				if (body.system) {
+					(body.system as Array<{ text: string }>).push(jsonInstruction);
+				} else {
+					body.system = [jsonInstruction];
+				}
+			}
+
+			const inferenceConfig: Record<string, unknown> = {};
+			if (cfg.maxTokens != null) inferenceConfig.maxTokens = cfg.maxTokens;
+			if (cfg.temperature != null) inferenceConfig.temperature = cfg.temperature;
+			if (cfg.topP != null) inferenceConfig.topP = cfg.topP;
+			if (cfg.stopSequences != null) inferenceConfig.stopSequences = cfg.stopSequences;
+			if (Object.keys(inferenceConfig).length > 0) {
+				body.inferenceConfig = inferenceConfig;
+			}
+
+			const url = `https://bedrock-runtime.${this.region}.amazonaws.com/model/${encodeURIComponent(cfg.model)}/converse-stream`;
+
+			const response = await this.awsClient.fetch(url, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(body),
+				signal: this.createTimeoutSignal(cfg.timeoutMs),
+			});
+
+			if (!response.ok) {
+				const data = (await response.json()) as Record<string, unknown>;
+				const errorMsg =
+					(data.message as string) || JSON.stringify(data) || `HTTP ${response.status}`;
+
+				if (RETRYABLE_STATUS_CODES.has(response.status)) {
+					throw new Error(`Bedrock API error (${response.status}): ${errorMsg}`);
+				}
+				return {
+					output: "",
+					latencyMs: Date.now() - startTime,
+					tokenUsage,
+					error: `Bedrock API error (${response.status}): ${errorMsg}`,
+				};
+			}
+
+			if (!response.body) {
+				throw new Error("Bedrock streaming response has no body");
+			}
+
+			for await (const event of parseBedrockEventStream(response.body)) {
+				if (event.type === "contentBlockDelta") {
+					const payload = event.payload as Record<string, unknown>;
+					const delta = payload.delta as Record<string, unknown> | undefined;
+					const text = delta?.text as string | undefined;
+					if (text) {
+						if (timeToFirstTokenMs === undefined) {
+							timeToFirstTokenMs = Date.now() - startTime;
+						}
+						chunks.push(text);
+					}
+				} else if (event.type === "metadata") {
+					const payload = event.payload as Record<string, unknown>;
+					const usage = payload.usage as Record<string, number> | undefined;
+					if (usage) {
+						tokenUsage = {
+							inputTokens: usage.inputTokens ?? 0,
+							outputTokens: usage.outputTokens ?? 0,
+							totalTokens: (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
+						};
+					}
+				}
+			}
+
+			return {
+				output: chunks.join(""),
+				latencyMs: Date.now() - startTime,
+				timeToFirstTokenMs,
+				tokenUsage,
+			};
+		} catch (error) {
+			const latencyMs = Date.now() - startTime;
+			if (error instanceof Error && error.message.startsWith("Bedrock API error")) {
+				throw error;
+			}
+			return {
+				output: chunks.join(""),
+				latencyMs,
+				timeToFirstTokenMs,
+				tokenUsage,
 				error: error instanceof Error ? error.message : String(error),
 			};
 		}

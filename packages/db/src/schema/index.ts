@@ -117,6 +117,7 @@ export const evalResults = sqliteTable(
 		expected: text("expected").notNull(),
 		error: text("error"),
 		latencyMs: real("latency_ms").notNull().default(0),
+		timeToFirstTokenMs: real("time_to_first_token_ms"),
 		inputTokens: integer("input_tokens").notNull().default(0),
 		outputTokens: integer("output_tokens").notNull().default(0),
 		totalTokens: integer("total_tokens").notNull().default(0),

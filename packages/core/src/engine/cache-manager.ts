@@ -32,6 +32,7 @@ export class CacheManager {
 			responseFormat: config?.responseFormat,
 			tools: config?.tools,
 			toolChoice: config?.toolChoice,
+			// Intentionally excludes `stream` — same prompt produces same output regardless
 		};
 
 		return createHash("sha256").update(JSON.stringify(keyData)).digest("hex");
@@ -58,6 +59,7 @@ export class CacheManager {
 		return {
 			output: entry.output,
 			latencyMs: 0,
+			timeToFirstTokenMs: 0,
 			tokenUsage: entry.tokenUsage ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
 			toolCalls: entry.toolCalls ? JSON.parse(entry.toolCalls) : undefined,
 		};

@@ -187,6 +187,24 @@ describe("validateConfig", () => {
 		expect(() => validateConfig(config)).toThrow("at least one scorer");
 	});
 
+	it("should accept a provider with stream: true", () => {
+		const config = {
+			projectName: "test",
+			providers: [{ type: "openai", name: "GPT", model: "gpt-4o", stream: true }],
+			scorers: [{ id: "exact-match", name: "Exact Match", type: "exact-match" }],
+		};
+		expect(() => validateConfig(config)).not.toThrow();
+	});
+
+	it("should reject non-boolean stream", () => {
+		const config = {
+			projectName: "test",
+			providers: [{ type: "openai", name: "GPT", model: "gpt-4o", stream: "yes" }],
+			scorers: [{ id: "exact-match", name: "Exact Match", type: "exact-match" }],
+		};
+		expect(() => validateConfig(config)).toThrow("stream must be a boolean");
+	});
+
 	it("should accept a provider with responseFormat", () => {
 		const config = {
 			projectName: "test",

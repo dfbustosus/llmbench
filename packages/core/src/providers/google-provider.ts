@@ -1,5 +1,12 @@
-import type { ChatMessage, ProviderConfig, ProviderResponse, ToolCall } from "@llmbench/types";
+import type {
+	ChatMessage,
+	ProviderConfig,
+	ProviderResponse,
+	TokenUsage,
+	ToolCall,
+} from "@llmbench/types";
 import { BaseProvider } from "./base-provider.js";
+import { parseSSE } from "./streaming/sse-parser.js";
 
 export class GoogleProvider extends BaseProvider {
 	private apiKey: string;
@@ -16,6 +23,11 @@ export class GoogleProvider extends BaseProvider {
 		overrides?: Partial<ProviderConfig>,
 	): Promise<ProviderResponse> {
 		const cfg = this.mergeConfig(overrides);
+
+		if (cfg.stream === true && !cfg.tools?.length) {
+			return this.generateStreaming(input, cfg, overrides);
+		}
+
 		const startTime = Date.now();
 
 		try {
@@ -152,6 +164,110 @@ export class GoogleProvider extends BaseProvider {
 				output: "",
 				latencyMs,
 				tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+				error: error instanceof Error ? error.message : String(error),
+			};
+		}
+	}
+
+	private async generateStreaming(
+		input: string | ChatMessage[],
+		cfg: ProviderConfig,
+		overrides?: Partial<ProviderConfig>,
+	): Promise<ProviderResponse> {
+		const startTime = Date.now();
+		let timeToFirstTokenMs: number | undefined;
+		const chunks: string[] = [];
+		let tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+
+		try {
+			const allMessages = this.buildMessages(input, overrides);
+			const systemMessages = allMessages.filter((m) => m.role === "system");
+			const nonSystemMessages = allMessages.filter((m) => m.role !== "system");
+			const systemText = systemMessages.map((m) => m.content).join("\n\n");
+
+			const contents = nonSystemMessages.map((m) => ({
+				role: m.role === "assistant" ? "model" : "user",
+				parts: [{ text: m.content }],
+			}));
+
+			const generationConfig: Record<string, unknown> = {
+				temperature: cfg.temperature ?? 0,
+				maxOutputTokens: cfg.maxTokens,
+				topP: cfg.topP,
+				stopSequences: cfg.stopSequences,
+			};
+			if (cfg.responseFormat?.type === "json_object") {
+				generationConfig.responseMimeType = "application/json";
+			}
+
+			const body: Record<string, unknown> = { contents, generationConfig };
+			if (systemText) {
+				body.systemInstruction = { parts: [{ text: systemText }] };
+			}
+
+			const url = `${this.baseUrl}/models/${cfg.model}:streamGenerateContent?alt=sse`;
+			const response = await fetch(url, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"x-goog-api-key": this.apiKey,
+				},
+				signal: this.createTimeoutSignal(cfg.timeoutMs),
+				body: JSON.stringify(body),
+			});
+
+			if (!response.ok) {
+				const data = (await response.json()) as Record<string, unknown>;
+				const err = data.error as Record<string, unknown> | undefined;
+				return {
+					output: "",
+					latencyMs: Date.now() - startTime,
+					tokenUsage,
+					error: (err?.message as string) || `HTTP ${response.status}`,
+				};
+			}
+
+			if (!response.body) {
+				throw new Error("Google streaming response has no body");
+			}
+
+			for await (const event of parseSSE(response.body)) {
+				const parsed = JSON.parse(event.data) as Record<string, unknown>;
+				const candidates = parsed.candidates as Array<Record<string, unknown>> | undefined;
+				const parts = (candidates?.[0]?.content as Record<string, unknown>)?.parts as
+					| Array<{ text?: string }>
+					| undefined;
+				const text = parts?.[0]?.text;
+
+				if (text) {
+					if (timeToFirstTokenMs === undefined) {
+						timeToFirstTokenMs = Date.now() - startTime;
+					}
+					chunks.push(text);
+				}
+
+				const usage = parsed.usageMetadata as Record<string, number> | undefined;
+				if (usage) {
+					tokenUsage = {
+						inputTokens: usage.promptTokenCount ?? 0,
+						outputTokens: usage.candidatesTokenCount ?? 0,
+						totalTokens: usage.totalTokenCount ?? 0,
+					};
+				}
+			}
+
+			return {
+				output: chunks.join(""),
+				latencyMs: Date.now() - startTime,
+				timeToFirstTokenMs,
+				tokenUsage,
+			};
+		} catch (error) {
+			return {
+				output: chunks.join(""),
+				latencyMs: Date.now() - startTime,
+				timeToFirstTokenMs,
+				tokenUsage,
 				error: error instanceof Error ? error.message : String(error),
 			};
 		}
