@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-03-22
+
+### Added
+
+- **Structured output / JSON mode** — `responseFormat: { type: "json_object" }` on `ProviderConfig`
+  - Native support for OpenAI, Azure OpenAI, Mistral, Together (`response_format`), Google (`responseMimeType`), Ollama (`format: "json"`)
+  - System prompt fallback with warning for Anthropic and Bedrock (no native JSON mode)
+  - `--json-mode` CLI flag for `eval` command
+  - Config validation rejects invalid `responseFormat` values
+  - Cache key includes `responseFormat` for correct differentiation
+- **Tool/function calling support** — `tools` and `toolChoice` on `ProviderConfig`, `toolCalls` on `ProviderResponse`
+  - Canonical `ToolDefinition` type (OpenAI format) mapped per-provider to native APIs
+  - `ToolCall` normalized output from all providers (Anthropic `tool_use`, Google `functionCall`, Bedrock `toolUse`)
+  - `toolChoice` support: `"auto"`, `"required"`, `"none"`, or specific function targeting
+  - `tool_calls` column added to `eval_results` and `cache_entries` (schema V3 migration)
+  - `toolCalls` persisted in evaluation results and cached responses
+  - Cache key includes `tools` and `toolChoice`
+  - Config validation for tool definitions and tool choice values
+- **Streaming responses with TTFT measurement** — `stream: true` on `ProviderConfig`, `timeToFirstTokenMs` on `ProviderResponse`
+  - Internal streaming for all providers: OpenAI-compatible (SSE), Anthropic (SSE), Google (SSE), Ollama (NDJSON), Bedrock (binary event stream)
+  - Reusable streaming parsers: `parseSSE`, `parseNDJSON`, `parseBedrockEventStream`
+  - Time-to-first-token (TTFT) measured when first content token arrives
+  - `time_to_first_token_ms` column added to `eval_results` (schema V4 migration)
+  - TTFT displayed in CLI results table when available
+  - Cached responses return `timeToFirstTokenMs: 0`
+  - Silent fallback to non-streaming when tools are configured
+- `ResponseFormat`, `ToolDefinition`, `ToolCall`, `ToolChoice`, `ToolFunction` types exported from `@llmbench/types`
+- `tools`, `toolChoice`, `responseFormat` exposed as readonly properties on `IProvider` and `BaseProvider`
+- `responseFormat`, `tools`, `toolChoice` propagated to cache key via engine `configOverrides`
+
+### Changed
+
+- Schema version bumped from 2 to 4 (V3: tool_calls columns, V4: time_to_first_token_ms)
+- `ProviderResponse.output` set to `JSON.stringify(toolCalls)` when model returns only tool calls (no text)
+- `eval_results` table now includes `tool_calls TEXT` and `time_to_first_token_ms REAL` columns
+- `cache_entries` table now includes `tool_calls TEXT` column
+
 ## [1.0.1] - 2026-03-21
 
 ### Added
