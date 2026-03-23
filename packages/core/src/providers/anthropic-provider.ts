@@ -1,5 +1,12 @@
-import type { ChatMessage, ProviderConfig, ProviderResponse, ToolCall } from "@llmbench/types";
+import type {
+	ChatMessage,
+	ProviderConfig,
+	ProviderResponse,
+	TokenUsage,
+	ToolCall,
+} from "@llmbench/types";
 import { BaseProvider } from "./base-provider.js";
+import { parseSSE } from "./streaming/sse-parser.js";
 
 export class AnthropicProvider extends BaseProvider {
 	private apiKey: string;
@@ -17,6 +24,11 @@ export class AnthropicProvider extends BaseProvider {
 		overrides?: Partial<ProviderConfig>,
 	): Promise<ProviderResponse> {
 		const cfg = this.mergeConfig(overrides);
+
+		if (cfg.stream === true && !cfg.tools?.length) {
+			return this.generateStreaming(input, cfg, overrides);
+		}
+
 		const startTime = Date.now();
 
 		try {
@@ -134,6 +146,119 @@ export class AnthropicProvider extends BaseProvider {
 				output: "",
 				latencyMs,
 				tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+				error: error instanceof Error ? error.message : String(error),
+			};
+		}
+	}
+
+	private async generateStreaming(
+		input: string | ChatMessage[],
+		cfg: ProviderConfig,
+		overrides?: Partial<ProviderConfig>,
+	): Promise<ProviderResponse> {
+		const startTime = Date.now();
+		let timeToFirstTokenMs: number | undefined;
+		const chunks: string[] = [];
+		const tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+
+		try {
+			const allMessages = this.buildMessages(input, overrides);
+			const systemMessages = allMessages.filter((m) => m.role === "system");
+			const nonSystemMessages = allMessages.filter((m) => m.role !== "system");
+			let systemText = systemMessages.map((m) => m.content).join("\n\n");
+
+			if (cfg.responseFormat?.type === "json_object") {
+				if (!this.jsonModeWarned) {
+					console.warn(
+						"[llmbench] Anthropic does not natively support JSON mode. " +
+							"Adding system prompt instruction for JSON output.",
+					);
+					this.jsonModeWarned = true;
+				}
+				const jsonInstruction =
+					"You must respond with valid JSON only. No markdown, no explanation, just valid JSON.";
+				systemText = systemText ? `${systemText}\n\n${jsonInstruction}` : jsonInstruction;
+			}
+
+			const body: Record<string, unknown> = {
+				model: cfg.model,
+				max_tokens: cfg.maxTokens ?? 1024,
+				messages: nonSystemMessages.map((m) => ({ role: m.role, content: m.content })),
+				temperature: cfg.temperature ?? 0,
+				top_p: cfg.topP,
+				stop_sequences: cfg.stopSequences,
+				stream: true,
+			};
+
+			if (systemText) body.system = systemText;
+
+			const response = await fetch(`${this.baseUrl}/messages`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"x-api-key": this.apiKey,
+					"anthropic-version": "2023-06-01",
+				},
+				body: JSON.stringify(body),
+				signal: this.createTimeoutSignal(cfg.timeoutMs),
+			});
+
+			if (!response.ok) {
+				const data = (await response.json()) as Record<string, unknown>;
+				const err = data.error as Record<string, unknown> | undefined;
+				return {
+					output: "",
+					latencyMs: Date.now() - startTime,
+					tokenUsage,
+					error: (err?.message as string) || `HTTP ${response.status}`,
+				};
+			}
+
+			if (!response.body) {
+				throw new Error("Anthropic streaming response has no body");
+			}
+
+			for await (const event of parseSSE(response.body)) {
+				const parsed = JSON.parse(event.data) as Record<string, unknown>;
+
+				if (event.event === "message_start") {
+					const msg = parsed.message as Record<string, unknown> | undefined;
+					const usage = msg?.usage as Record<string, number> | undefined;
+					if (usage) {
+						tokenUsage.inputTokens = usage.input_tokens ?? 0;
+					}
+				} else if (event.event === "content_block_delta") {
+					const delta = parsed.delta as Record<string, unknown> | undefined;
+					const text = delta?.text as string | undefined;
+					if (text) {
+						if (timeToFirstTokenMs === undefined) {
+							timeToFirstTokenMs = Date.now() - startTime;
+						}
+						chunks.push(text);
+					}
+				} else if (event.event === "message_delta") {
+					const usage = parsed.usage as Record<string, number> | undefined;
+					if (usage) {
+						tokenUsage.outputTokens = usage.output_tokens ?? 0;
+						tokenUsage.totalTokens = tokenUsage.inputTokens + tokenUsage.outputTokens;
+					}
+				} else if (event.event === "message_stop") {
+					break;
+				}
+			}
+
+			return {
+				output: chunks.join(""),
+				latencyMs: Date.now() - startTime,
+				timeToFirstTokenMs,
+				tokenUsage,
+			};
+		} catch (error) {
+			return {
+				output: chunks.join(""),
+				latencyMs: Date.now() - startTime,
+				timeToFirstTokenMs,
+				tokenUsage,
 				error: error instanceof Error ? error.message : String(error),
 			};
 		}
