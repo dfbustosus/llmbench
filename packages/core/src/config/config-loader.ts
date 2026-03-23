@@ -141,6 +141,9 @@ function validateProviderConfig(
 	if (typeof p.model !== "string" || !p.model) {
 		throw new Error(`providers[${index}].model must be a non-empty string`);
 	}
+	if (p.stream !== undefined && typeof p.stream !== "boolean") {
+		throw new Error(`providers[${index}].stream must be a boolean`);
+	}
 	if (p.responseFormat !== undefined) {
 		if (!p.responseFormat || typeof p.responseFormat !== "object") {
 			throw new Error(`providers[${index}].responseFormat must be an object`);
