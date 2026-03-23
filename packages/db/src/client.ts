@@ -23,7 +23,7 @@ export function createInMemoryDB() {
 	return db;
 }
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 export function initializeDB(db: LLMBenchDB) {
 	// 1. Create schema_migrations table
@@ -142,6 +142,7 @@ function createTables(db: LLMBenchDB) {
 			expected TEXT NOT NULL,
 			error TEXT,
 			latency_ms REAL NOT NULL DEFAULT 0,
+			time_to_first_token_ms REAL,
 			input_tokens INTEGER NOT NULL DEFAULT 0,
 			output_tokens INTEGER NOT NULL DEFAULT 0,
 			total_tokens INTEGER NOT NULL DEFAULT 0,
@@ -319,6 +320,9 @@ function runMigrations(db: LLMBenchDB, fromVersion: number) {
 	if (fromVersion < 3) {
 		migrateToV3(db);
 	}
+	if (fromVersion < 4) {
+		migrateToV4(db);
+	}
 }
 
 /** Check whether a column exists on a table (avoids try/catch ALTER TABLE). */
@@ -464,5 +468,12 @@ function migrateToV3(db: LLMBenchDB) {
 	}
 	if (!columnExists(db, "cache_entries", "tool_calls")) {
 		db.run(`ALTER TABLE cache_entries ADD COLUMN tool_calls TEXT`);
+	}
+}
+
+function migrateToV4(db: LLMBenchDB) {
+	// V4 adds time_to_first_token_ms for streaming TTFT measurement
+	if (!columnExists(db, "eval_results", "time_to_first_token_ms")) {
+		db.run(`ALTER TABLE eval_results ADD COLUMN time_to_first_token_ms REAL`);
 	}
 }
