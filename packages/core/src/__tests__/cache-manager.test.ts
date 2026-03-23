@@ -168,6 +168,15 @@ describe("CacheManager", () => {
 			expect(key1).toBe(key2);
 		});
 
+		it("should produce same key regardless of stream setting", () => {
+			const key1 = cache.computeKey("p1", "gpt-4", "Hello", { temperature: 0.7 });
+			const key2 = cache.computeKey("p1", "gpt-4", "Hello", {
+				temperature: 0.7,
+				stream: true,
+			} as never);
+			expect(key1).toBe(key2);
+		});
+
 		it("should produce different keys when tools differ", () => {
 			const tools = [
 				{
