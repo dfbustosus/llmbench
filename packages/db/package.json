@@ -1,6 +1,6 @@
 {
 	"name": "@llmbench/db",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "SQLite database layer for LLMBench",
 	"type": "module",
 	"license": "Apache-2.0",

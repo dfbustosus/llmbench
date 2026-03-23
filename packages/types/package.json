@@ -1,6 +1,6 @@
 {
 	"name": "@llmbench/types",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "TypeScript type definitions for LLMBench",
 	"type": "module",
 	"license": "Apache-2.0",
