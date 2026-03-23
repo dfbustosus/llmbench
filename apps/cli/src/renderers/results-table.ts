@@ -19,11 +19,30 @@ export function renderResultsTable(
 		}
 	}
 
-	const head = ["#", "Input", "Expected", "Output", ...scorerNames, "Latency", "Cost"];
+	const hasTtft = results.some((r) => r.timeToFirstTokenMs != null);
+	const head = [
+		"#",
+		"Input",
+		"Expected",
+		"Output",
+		...scorerNames,
+		"Latency",
+		...(hasTtft ? ["TTFT"] : []),
+		"Cost",
+	];
 
 	const table = new Table({
 		head: head.map((h) => chalk.cyan(h)),
-		colWidths: [4, 30, 20, 30, ...Array.from(scorerNames).map(() => 12), 10, 10],
+		colWidths: [
+			4,
+			30,
+			20,
+			30,
+			...Array.from(scorerNames).map(() => 12),
+			10,
+			...(hasTtft ? [8] : []),
+			10,
+		],
 		wordWrap: true,
 	});
 
@@ -45,6 +64,9 @@ export function renderResultsTable(
 			result.error ? chalk.red(truncate(result.error, 27)) : truncate(result.output, 27),
 			...scoreValues,
 			`${result.latencyMs.toFixed(0)}ms`,
+			...(hasTtft
+				? [result.timeToFirstTokenMs != null ? `${result.timeToFirstTokenMs.toFixed(0)}ms` : "-"]
+				: []),
 			result.cost ? `$${result.cost.toFixed(4)}` : "-",
 		]);
 	});
