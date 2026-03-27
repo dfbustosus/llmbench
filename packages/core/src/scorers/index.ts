@@ -1,4 +1,7 @@
 import type { IProvider, IScorer, ScorerConfig } from "@llmbench/types";
+import { GoalCompletionScorer } from "./agent/goal-completion.js";
+import { ToolCallAccuracyScorer } from "./agent/tool-call-accuracy.js";
+import { TrajectoryValidationScorer } from "./agent/trajectory-validation.js";
 import { WeightedAverageScorer } from "./composite/weighted-average.js";
 import { ContainsScorer } from "./deterministic/contains.js";
 import { ExactMatchScorer } from "./deterministic/exact-match.js";
@@ -17,6 +20,7 @@ import { EmbeddingSimilarityScorer } from "./semantic/embedding-similarity.js";
 import { LevenshteinScorer } from "./semantic/levenshtein.js";
 import { RougeScorer } from "./semantic/rouge.js";
 
+export * from "./agent/index.js";
 export { computeScorerAverages } from "./averages.js";
 export * from "./composite/index.js";
 export * from "./deterministic/index.js";
@@ -120,6 +124,16 @@ export function createScorer(config: ScorerConfig, options?: CreateScorerOptions
 			return new AnswerRelevancyScorer(options.provider, {
 				numQuestions: opts.numQuestions as number | undefined,
 			});
+		}
+		case "tool-call-accuracy":
+			return new ToolCallAccuracyScorer();
+		case "trajectory-validation":
+			return new TrajectoryValidationScorer();
+		case "goal-completion": {
+			if (!options?.provider) {
+				throw new Error("Goal completion scorer requires a provider in options");
+			}
+			return new GoalCompletionScorer(options.provider);
 		}
 		default:
 			throw new Error(`Unknown scorer type: ${config.type}`);
