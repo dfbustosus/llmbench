@@ -241,13 +241,18 @@ export class EvaluationEngine {
 						});
 
 						// Run scorers (pre-created from assertions or global scorers)
+						// Merge response.toolCalls into context so agent scorers can access them
+						const scorerContext = {
+							...testCase.context,
+							toolCalls: response.toolCalls,
+						};
 						const scores: ScoreResult[] = [];
 						for (const { scorer, expected } of caseScorers) {
 							const scoreResult = await scorer.score(
 								response.output,
 								expected,
 								testCase.input,
-								testCase.context,
+								scorerContext,
 							);
 							scores.push(scoreResult);
 						}

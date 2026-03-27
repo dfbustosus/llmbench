@@ -9,6 +9,7 @@ const UNSUPPORTED_INLINE_TYPES = new Set([
 	"context-recall",
 	"faithfulness",
 	"answer-relevancy",
+	"goal-completion",
 ]);
 
 /**

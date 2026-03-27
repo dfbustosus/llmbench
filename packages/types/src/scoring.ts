@@ -25,7 +25,10 @@ export type ScorerType =
 	| "context-precision"
 	| "context-recall"
 	| "faithfulness"
-	| "answer-relevancy";
+	| "answer-relevancy"
+	| "tool-call-accuracy"
+	| "trajectory-validation"
+	| "goal-completion";
 
 export interface ScorerConfig {
 	id: string;
