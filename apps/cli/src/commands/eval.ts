@@ -65,6 +65,9 @@ const VALID_SCORER_TYPES = new Set<string>([
 	"context-recall",
 	"faithfulness",
 	"answer-relevancy",
+	"tool-call-accuracy",
+	"trajectory-validation",
+	"goal-completion",
 ]);
 
 export function parseProviderShorthand(shorthand: string): ProviderConfig {
