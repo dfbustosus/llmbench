@@ -37,7 +37,7 @@ npx @llmbench/cli eval "What is the capital of France?" -p openai:gpt-4o -p anth
 ## Features
 
 - **9 providers** — OpenAI, Anthropic, Google AI, Mistral, Together AI, AWS Bedrock, Azure OpenAI, Ollama, or fully custom providers. Compare side-by-side.
-- **12 built-in scorers** — Exact match, contains, regex, JSON deep compare, JSON schema validation, cosine similarity, Levenshtein distance, BLEU, ROUGE, embedding similarity, LLM-as-judge, and weighted composite.
+- **19 built-in scorers** — Deterministic (exact match, contains, regex, JSON match, JSON schema), semantic (cosine similarity, Levenshtein, BLEU, ROUGE, embedding similarity), RAG (context precision, context recall, faithfulness, answer relevancy), agent (tool call accuracy, trajectory validation, goal completion), LLM-as-judge, and weighted composite.
 - **Per-test-case assertions** — Override global scorers on individual test cases with inline `assert` rules. Test different criteria per prompt.
 - **Graceful cancellation** — Press Ctrl+C for cooperative cancellation that lets in-flight API calls finish. Double Ctrl+C to force quit. Cancel stuck runs from the web dashboard. Full `AbortSignal` support in the SDK.
 - **Quick eval mode** — `llmbench eval "prompt" -p openai:gpt-4o` — test a single prompt ad-hoc without creating files.
@@ -308,20 +308,27 @@ API keys are read from environment variables only. They are never stored in the 
 
 ## Scorers
 
-| Scorer | Config type | Description |
-|--------|-------------|-------------|
-| Exact Match | `exact-match` | Binary match with optional case/trim normalization |
-| Contains | `contains` | Checks if output contains the expected text |
-| Regex | `regex` | Pattern matching with configurable flags |
-| JSON Match | `json-match` | Deep JSON comparison with partial matching support |
-| JSON Schema | `json-schema` | Validates output against a JSON schema |
-| Cosine Similarity | `cosine-similarity` | Token-based vector similarity (0-1) |
-| Levenshtein | `levenshtein` | Edit-distance-based similarity (0-1) |
-| BLEU | `bleu` | Machine translation quality metric |
-| ROUGE | `rouge` | Recall-oriented summary evaluation |
-| Embedding Similarity | `embedding-similarity` | Embedding-based semantic similarity |
-| LLM Judge | `llm-judge` | Use an LLM to evaluate outputs against a custom rubric |
-| Weighted Average | `composite` | Combine multiple scorers with custom weights |
+| Scorer | Config type | Category | Description |
+|--------|-------------|----------|-------------|
+| Exact Match | `exact-match` | Deterministic | Binary match with optional case/trim normalization |
+| Contains | `contains` | Deterministic | Checks if output contains the expected text |
+| Regex | `regex` | Deterministic | Pattern matching with configurable flags |
+| JSON Match | `json-match` | Deterministic | Deep JSON comparison with partial matching support |
+| JSON Schema | `json-schema` | Deterministic | Validates output against a JSON schema |
+| Cosine Similarity | `cosine-similarity` | Semantic | Token-based vector similarity (0-1) |
+| Levenshtein | `levenshtein` | Semantic | Edit-distance-based similarity (0-1) |
+| BLEU | `bleu` | Semantic | Machine translation quality metric |
+| ROUGE | `rouge` | Semantic | Recall-oriented summary evaluation |
+| Embedding Similarity | `embedding-similarity` | Semantic | Embedding-based semantic similarity |
+| Context Precision | `context-precision` | RAG | Ranking quality of retrieved context documents |
+| Context Recall | `context-recall` | RAG | Coverage of ground truth by retrieved context |
+| Faithfulness | `faithfulness` | RAG | Factual consistency between answer and context (hallucination detection) |
+| Answer Relevancy | `answer-relevancy` | RAG | How well the answer addresses the original question |
+| Tool Call Accuracy | `tool-call-accuracy` | Agent | Correct function names and arguments vs expected |
+| Trajectory Validation | `trajectory-validation` | Agent | Tool call ordering via longest common subsequence |
+| Goal Completion | `goal-completion` | Agent | LLM judges whether the agent achieved its goal |
+| LLM Judge | `llm-judge` | LLM | Evaluate outputs against a custom rubric |
+| Weighted Average | `composite` | Composite | Combine multiple scorers with custom weights |
 
 ## How It Compares
 
@@ -332,6 +339,8 @@ API keys are read from environment variables only. They are never stored in the 
 | TypeScript config | Yes | No | No | No |
 | Per-test assertions | Yes | Yes | No | No |
 | Quick eval mode | Yes | Yes | No | No |
+| RAG scorers | Yes | Partial | No | No |
+| Agent/tool-use scorers | Yes | Partial | No | No |
 | Web dashboard | Yes | No | Yes | Yes |
 | Export JSON/CSV/HTML | Yes | JSON only | No | No |
 | CI gates | Yes | Yes | No | Partial |
