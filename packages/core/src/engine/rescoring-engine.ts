@@ -161,14 +161,16 @@ export class RescoringEngine {
 			}));
 		}
 
+		// Merge stored toolCalls into context so agent scorers can access them
+		const scorerContext = testCase?.context
+			? { ...testCase.context, toolCalls: result.toolCalls }
+			: result.toolCalls
+				? { toolCalls: result.toolCalls }
+				: undefined;
+
 		const scores: ScoreResult[] = [];
 		for (const { scorer, expected } of caseScorers) {
-			const scoreResult = await scorer.score(
-				result.output,
-				expected,
-				result.input,
-				testCase?.context,
-			);
+			const scoreResult = await scorer.score(result.output, expected, result.input, scorerContext);
 			scores.push(scoreResult);
 		}
 
