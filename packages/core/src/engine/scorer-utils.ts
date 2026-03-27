@@ -1,7 +1,15 @@
 import type { IScorer, ScorerConfig, TestCaseAssertion } from "@llmbench/types";
 import { createScorer } from "../scorers/index.js";
 
-const UNSUPPORTED_INLINE_TYPES = new Set(["llm-judge", "composite", "embedding-similarity"]);
+const UNSUPPORTED_INLINE_TYPES = new Set([
+	"llm-judge",
+	"composite",
+	"embedding-similarity",
+	"context-precision",
+	"context-recall",
+	"faithfulness",
+	"answer-relevancy",
+]);
 
 /**
  * Creates an IScorer from a per-test-case assertion.
