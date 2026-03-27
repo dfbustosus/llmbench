@@ -243,7 +243,12 @@ export class EvaluationEngine {
 						// Run scorers (pre-created from assertions or global scorers)
 						const scores: ScoreResult[] = [];
 						for (const { scorer, expected } of caseScorers) {
-							const scoreResult = await scorer.score(response.output, expected, testCase.input);
+							const scoreResult = await scorer.score(
+								response.output,
+								expected,
+								testCase.input,
+								testCase.context,
+							);
 							scores.push(scoreResult);
 						}
 
