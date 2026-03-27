@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-03-26
+
+### Added
+
+- **RAG evaluation scorers** — 4 Ragas-style metrics for retrieval-augmented generation evaluation
+  - `context-precision` — Average Precision over LLM-judged chunk relevance (1 LLM call)
+  - `context-recall` — Fraction of ground truth claims inferable from retrieved context (2 LLM calls)
+  - `faithfulness` — Fraction of answer claims supported by context, quantifies hallucination (2 LLM calls)
+  - `answer-relevancy` — Reverse-question similarity to original question (1 LLM call)
+  - Shared utilities: `extractClaims`, `classifyClaims`, `parseJsonResponse` for DRY LLM-based scoring
+  - Convention: users store retrieved documents as `context.contexts: string[]` in test case context
+- **Agent/tool-use evaluation scorers** — 3 metrics for evaluating agent behavior
+  - `tool-call-accuracy` — Deterministic: compares actual vs expected tool calls (name + deep-equal arguments, key-order insensitive)
+  - `trajectory-validation` — Deterministic: validates tool call ordering via Longest Common Subsequence (extra calls allowed)
+  - `goal-completion` — LLM-based: judges whether the agent achieved its stated goal (1 LLM call)
+  - Engine injects `response.toolCalls` into scorer context so agent scorers access actual tool calls
+  - Users provide expected calls via `context.expectedToolCalls` in test case context
+- `IScorer.score()` extended with optional 4th parameter `context?: Record<string, unknown>` for passing test case context to scorers (backward-compatible)
+- `scorerOptions` field on `EvaluateOptions` and `EvaluateQuickOptions` — enables LLM-based scorers (RAG, agent, llm-judge) via the programmatic SDK
+- CLI commands (`run`, `eval`, `rescore`) now resolve `options.provider` from configured providers, enabling LLM-based scorers via config
+- `tool-call-accuracy` and `trajectory-validation` can be used as inline per-test-case assertions (deterministic, no provider needed)
+
+### Fixed
+
+- `picomatch` ReDoS vulnerability (GHSA-c2c7-rcm5-vvqj) patched via pnpm override to `>=4.0.4`
+- Context Precision scorer pads verdicts with `false` when LLM returns fewer than expected, preventing inflated AP scores
+- `extractContexts` now filters empty and whitespace-only strings from context arrays
+- `evaluate()` SDK previously could not create LLM-based scorers (llm-judge, embedding-similarity) — now accepts `scorerOptions`
+
+### Changed
+
+- Scorer count increased from 12 to 19 (4 RAG + 3 agent)
+- `WeightedAverageScorer` forwards the `context` parameter to child scorers
+- `EvaluationEngine` merges `response.toolCalls` into scorer context before scoring
+- `RescoringEngine` merges stored `result.toolCalls` into scorer context when rescoring
+
 ## [1.0.2] - 2026-03-22
 
 ### Added
