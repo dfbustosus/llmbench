@@ -32,6 +32,7 @@ import { EventPersister } from "../engine/event-persister.js";
 import type { CustomGenerateFn } from "../providers/custom-provider.js";
 import { createProvider } from "../providers/index.js";
 import { computeScorerAverages } from "../scorers/averages.js";
+import type { CreateScorerOptions } from "../scorers/index.js";
 import { createScorer } from "../scorers/index.js";
 
 export type { CustomGenerateFn } from "../providers/custom-provider.js";
@@ -67,6 +68,8 @@ export interface EvaluateOptions {
 	datasetName?: string;
 	/** For type:"custom" providers. */
 	customProviders?: Map<string, CustomGenerateFn>;
+	/** Options for scorers that need external dependencies (llm-judge, RAG scorers, embedding-similarity). */
+	scorerOptions?: CreateScorerOptions;
 	/** Enable response caching. Only effective with a persistent DB. */
 	cache?: { ttlHours?: number };
 	/** AbortSignal for cooperative cancellation. */
@@ -88,6 +91,8 @@ export interface EvaluateQuickOptions {
 	projectName?: string;
 	datasetName?: string;
 	customProviders?: Map<string, CustomGenerateFn>;
+	/** Options for scorers that need external dependencies (llm-judge, RAG scorers, embedding-similarity). */
+	scorerOptions?: CreateScorerOptions;
 	cache?: { ttlHours?: number };
 	/** AbortSignal for cooperative cancellation. */
 	signal?: AbortSignal;
@@ -220,7 +225,7 @@ export async function evaluate(options: EvaluateOptions): Promise<EvaluateResult
 
 	// 7. Create scorers
 	const scorerConfigs = options.scorers === undefined ? DEFAULT_SCORER_CONFIGS : options.scorers;
-	const scorers = scorerConfigs.map((sc) => createScorer(sc));
+	const scorers = scorerConfigs.map((sc) => createScorer(sc, options.scorerOptions));
 
 	// 8. Create EvalRun
 	const concurrency = options.concurrency ?? 5;
@@ -349,6 +354,7 @@ export async function evaluateQuick(options: EvaluateQuickOptions): Promise<Eval
 		projectName: options.projectName,
 		datasetName: options.datasetName,
 		customProviders: options.customProviders,
+		scorerOptions: options.scorerOptions,
 		cache: options.cache,
 		signal: options.signal,
 	});

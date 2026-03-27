@@ -310,4 +310,57 @@ describe("evaluateQuick() SDK", () => {
 		expect(result.results).toHaveLength(1);
 		expect(result.results[0].result.timeToFirstTokenMs).toBe(50);
 	});
+
+	it("should pass scorerOptions to RAG scorers via evaluate()", async () => {
+		// Mock judge provider that returns a faithfulness verdict
+		const judgeFn: CustomGenerateFn = async (input) => {
+			const text = typeof input === "string" ? input : "";
+			if (text.includes("Break the following text")) {
+				return {
+					output: JSON.stringify({ claims: ["Paris is the capital"] }),
+					latencyMs: 10,
+					tokenUsage: { inputTokens: 10, outputTokens: 10, totalTokens: 20 },
+				};
+			}
+			return {
+				output: JSON.stringify({
+					verdicts: [{ supported: true, reason: "found in context" }],
+				}),
+				latencyMs: 10,
+				tokenUsage: { inputTokens: 10, outputTokens: 10, totalTokens: 20 },
+			};
+		};
+
+		const judgeProvider = {
+			type: "custom" as const,
+			name: "Judge",
+			model: "judge-model",
+		};
+
+		const { createProvider } = await import("../providers/index.js");
+		const judgeInstance = createProvider(judgeProvider, judgeFn);
+
+		const result = await evaluate({
+			testCases: [
+				{
+					input: "What is the capital of France?",
+					expected: "Paris",
+					context: {
+						contexts: ["Paris is the capital of France."],
+					},
+				},
+			],
+			providers: [makeCustomConfig("TestLLM")],
+			scorers: [{ id: "faith", name: "Faithfulness", type: "faithfulness" }],
+			scorerOptions: { provider: judgeInstance },
+			customProviders: new Map([["TestLLM", cannedGenerateFn]]),
+		});
+
+		expect(result.status).toBe("completed");
+		expect(result.results).toHaveLength(1);
+		const scores = result.results[0].scores;
+		const faithScore = scores.find((s) => s.scorerType === "faithfulness");
+		expect(faithScore).toBeDefined();
+		expect(faithScore?.value).toBe(1);
+	});
 });

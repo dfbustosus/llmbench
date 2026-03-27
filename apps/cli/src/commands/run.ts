@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
+import type { CreateScorerOptions } from "@llmbench/core";
 import {
 	CacheManager,
 	CostCalculator,
@@ -248,9 +249,13 @@ export const runCommand = new Command("run")
 			}
 
 			const providerMap = new Map<string, ReturnType<typeof createProvider>>();
+			const providersByName = new Map<string, ReturnType<typeof createProvider>>();
 			const providerIds: string[] = [];
 
 			for (const pc of config.providers) {
+				const provider = createProvider(pc);
+				providersByName.set(pc.name, provider);
+
 				let providerRecord = await providerRepo.findByProjectAndName(project.id, pc.name);
 				if (!providerRecord) {
 					providerRecord = await providerRepo.create({
@@ -262,11 +267,21 @@ export const runCommand = new Command("run")
 					});
 				}
 				providerIds.push(providerRecord.id);
-				providerMap.set(providerRecord.id, createProvider(pc));
+				providerMap.set(providerRecord.id, provider);
 			}
 
 			// Create scorers using the factory
-			const scorers: IScorer[] = config.scorers.map((sc) => createScorer(sc));
+			const scorers: IScorer[] = config.scorers.map((sc) => {
+				const scorerOpts: CreateScorerOptions = {};
+				const providerName = sc.options?.provider as string | undefined;
+				if (providerName && providersByName.has(providerName)) {
+					scorerOpts.provider = providersByName.get(providerName);
+				} else if (providersByName.size > 0) {
+					// Default to first provider for LLM-based scorers that don't specify one
+					scorerOpts.provider = providersByName.values().next().value;
+				}
+				return createScorer(sc, scorerOpts);
+			});
 
 			// Create run
 			if (spinner) spinner.text = "Starting evaluation...";

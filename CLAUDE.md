@@ -43,11 +43,11 @@ npx vitest run packages/core/src/__tests__/scorers.test.ts
 ### Packages
 
 - **`@llmbench/types`** — Pure TypeScript interfaces/types, zero runtime deps. All shared contracts (`IProvider`, `IScorer`, `LLMBenchConfig`, `EvalRun`, etc.) live here. Modify types here first when changing interfaces.
-- **`@llmbench/db`** — Drizzle ORM + better-sqlite3. Schema in `src/schema/index.ts`, repository pattern in `src/repositories/`. Uses WAL mode. Tests use in-memory SQLite. All IDs are text (string-based, not UUID). Repositories: Project, Dataset, TestCase, EvalRun, EvalResult, Score, CostRecord, Provider, Cache.
+- **`@llmbench/db`** — Drizzle ORM + better-sqlite3. Schema in `src/schema/index.ts`, repository pattern in `src/repositories/`. Uses WAL mode. Tests use in-memory SQLite. All IDs are text (string-based, not UUID). Repositories: Project, Dataset, TestCase, EvalRun, EvalResult, Score, CostRecord, Provider, Cache. **Migrations**: Embedded versioned migrations in `src/client.ts` (SCHEMA_VERSION = 4), not Drizzle CLI — each version has a `migrateToVN()` function with backward-compatible ALTER TABLE statements.
 - **`@llmbench/core`** — Evaluation engine, LLM providers, scorers, cost calculator, config loader. Key entry points: `createProvider()` factory, `createScorer()` factory, `EvaluationEngine` class.
 - **`@llmbench/ui`** — React component library (shadcn/ui + CVA + tailwind-merge). Peer dep on React 19.
 - **`apps/cli`** (`llmbench`) — Commander-based CLI. Commands: `init`, `run`, `list`, `compare`, `serve`.
-- **`apps/web`** — Next.js 15 (App Router) dashboard with tRPC v11 API. tRPC routers in `src/trpc/routers/` (project, dataset, eval-run, comparison). Uses SuperJSON serialization and Zod validation. Webpack config externalizes `better-sqlite3` on the server side.
+- **`apps/web`** — Next.js 15 (App Router) dashboard with tRPC v11 API. tRPC routers in `src/trpc/routers/` (project, dataset, eval-run, comparison). Uses SuperJSON serialization and Zod validation. Webpack config externalizes `better-sqlite3` on the server side. DB and repository singletons are cached on `globalThis` to survive HMR in dev. Path alias: `@/*` → `./src/*`.
 
 ### Key Patterns
 
@@ -57,7 +57,7 @@ npx vitest run packages/core/src/__tests__/scorers.test.ts
 - **Scorer pattern**: Implement `IScorer` interface, place in `packages/core/src/scorers/{category}/`. Register in `createScorer()` factory. Categories: `deterministic/` (exact-match, contains, regex, json-match, json-schema), `semantic/` (cosine-similarity, levenshtein, bleu, rouge, embedding-similarity), `llm-judge/`, `composite/` (weighted-average).
 - **Engine**: `EvaluationEngine` orchestrates runs with concurrency control (`ConcurrencyManager`), retries (`RetryHandler`), event emission (`EventBus`), prompt interpolation (`TemplateEngine`), and response caching (`CacheManager` — SHA-256 keyed with optional TTL). All in `packages/core/src/engine/`.
 - **Template engine**: `interpolate()` and `interpolateMessages()` substitute `{{variable}}` placeholders in prompts using test case context. Supports both string prompts and `ChatMessage[]` multi-turn inputs.
-- **Subpath exports**: `@llmbench/core` exposes subpaths: `./providers`, `./scorers`, `./engine`, `./cost`, `./comparison`, `./config`.
+- **Subpath exports**: `@llmbench/core` exposes subpaths: `./providers`, `./scorers`, `./engine`, `./cost`, `./comparison`, `./gate`, `./config`, `./sdk`.
 - **All packages are ESM** (`"type": "module"`). Use `.js` extensions in imports even for TypeScript files.
 
 ## Code Style
@@ -76,6 +76,12 @@ npx vitest run packages/core/src/__tests__/scorers.test.ts
 - Tests go in `src/__tests__/` directories within each package
 - Test globals are enabled (no need to import `describe`, `it`, `expect`)
 - DB tests use in-memory SQLite
+
+## CI
+
+- GitHub Actions runs tests on Node 20 and 22 (matrix strategy)
+- Security audit job checks for critical/high vulnerabilities
+- Release pipeline triggered by `v*` tags, publishes to npm with provenance
 
 ## Node Version
 

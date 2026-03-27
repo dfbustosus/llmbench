@@ -21,7 +21,11 @@ export type ScorerType =
 	| "embedding-similarity"
 	| "llm-judge"
 	| "composite"
-	| "custom";
+	| "custom"
+	| "context-precision"
+	| "context-recall"
+	| "faithfulness"
+	| "answer-relevancy";
 
 export interface ScorerConfig {
 	id: string;
@@ -36,7 +40,12 @@ export interface IScorer {
 	readonly name: string;
 	readonly type: ScorerType;
 
-	score(output: string, expected: string, input?: string): Promise<ScoreResult>;
+	score(
+		output: string,
+		expected: string,
+		input?: string,
+		context?: Record<string, unknown>,
+	): Promise<ScoreResult>;
 }
 
 /** Inline assertion on a single test case. Overrides global scorers when present. */

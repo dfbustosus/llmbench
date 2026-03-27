@@ -24,6 +24,9 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "better-sqlite3"
-    ]
+    ],
+    "overrides": {
+      "picomatch": ">=4.0.4"
+    }
   }
 }

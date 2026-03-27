@@ -1,6 +1,8 @@
 import { resolve } from "node:path";
+import type { CreateScorerOptions } from "@llmbench/core";
 import {
 	computeScorerAverages,
+	createProvider,
 	createScorer,
 	EventPersister,
 	loadConfig,
@@ -74,7 +76,17 @@ export const rescoreCommand = new Command("rescore")
 			}
 
 			// 4. Create scorer instances
-			const scorers: IScorer[] = scorerConfigs.map((sc) => createScorer(sc));
+			const providersByName = new Map(config.providers.map((pc) => [pc.name, createProvider(pc)]));
+			const scorers: IScorer[] = scorerConfigs.map((sc) => {
+				const scorerOpts: CreateScorerOptions = {};
+				const providerName = sc.options?.provider as string | undefined;
+				if (providerName && providersByName.has(providerName)) {
+					scorerOpts.provider = providersByName.get(providerName);
+				} else if (providersByName.size > 0) {
+					scorerOpts.provider = providersByName.values().next().value;
+				}
+				return createScorer(sc, scorerOpts);
+			});
 
 			// 5. Build test case map for assertion support
 			const results = await evalResultRepo.findByRunId(run.id);

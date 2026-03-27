@@ -163,7 +163,12 @@ export class RescoringEngine {
 
 		const scores: ScoreResult[] = [];
 		for (const { scorer, expected } of caseScorers) {
-			const scoreResult = await scorer.score(result.output, expected, result.input);
+			const scoreResult = await scorer.score(
+				result.output,
+				expected,
+				result.input,
+				testCase?.context,
+			);
 			scores.push(scoreResult);
 		}
 

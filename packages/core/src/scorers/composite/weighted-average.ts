@@ -11,10 +11,15 @@ export class WeightedAverageScorer implements IScorer {
 		this.name = name ?? "Weighted Average";
 	}
 
-	async score(output: string, expected: string, input?: string): Promise<ScoreResult> {
+	async score(
+		output: string,
+		expected: string,
+		input?: string,
+		context?: Record<string, unknown>,
+	): Promise<ScoreResult> {
 		const results = await Promise.all(
 			this.scorers.map(async ({ scorer, weight }) => ({
-				result: await scorer.score(output, expected, input),
+				result: await scorer.score(output, expected, input, context),
 				weight,
 			})),
 		);
