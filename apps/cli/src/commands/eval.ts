@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import type { CreateScorerOptions } from "@llmbench/core";
 import {
 	CostCalculator,
 	createProvider,
@@ -60,6 +61,10 @@ const VALID_SCORER_TYPES = new Set<string>([
 	"llm-judge",
 	"composite",
 	"custom",
+	"context-precision",
+	"context-recall",
+	"faithfulness",
+	"answer-relevancy",
 ]);
 
 export function parseProviderShorthand(shorthand: string): ProviderConfig {
@@ -259,12 +264,22 @@ async function runNoSave(
 	spinner: ReturnType<typeof ora> | null,
 ): Promise<EvalExportData> {
 	const costCalculator = new CostCalculator();
-	const scorers: IScorer[] = scorerConfigs.map((sc) => createScorer(sc));
+	const providersByName = new Map(providerConfigs.map((pc) => [pc.name, createProvider(pc)]));
+	const scorers: IScorer[] = scorerConfigs.map((sc) => {
+		const scorerOpts: CreateScorerOptions = {};
+		const providerName = sc.options?.provider as string | undefined;
+		if (providerName && providersByName.has(providerName)) {
+			scorerOpts.provider = providersByName.get(providerName);
+		} else if (providersByName.size > 0) {
+			scorerOpts.provider = providersByName.values().next().value;
+		}
+		return createScorer(sc, scorerOpts);
+	});
 	const results: EvalResultData[] = [];
 
 	for (const pc of providerConfigs) {
 		if (spinner) spinner.text = `Calling ${pc.name}...`;
-		const provider = createProvider(pc);
+		const provider = providersByName.get(pc.name) ?? createProvider(pc);
 
 		try {
 			const response = await provider.generate(prompt, pc);
@@ -376,10 +391,14 @@ async function runWithSave(
 
 	// Create providers (DB records + live instances)
 	const providerMap = new Map<string, IProvider>();
+	const providersByName = new Map<string, IProvider>();
 	const providerIds: string[] = [];
 	const providerIdToConfig = new Map<string, ProviderConfig>();
 
 	for (const pc of providerConfigs) {
+		const provider = createProvider(pc);
+		providersByName.set(pc.name, provider);
+
 		let providerRecord = await providerRepo.findByProjectAndName(project.id, pc.name);
 		if (!providerRecord) {
 			providerRecord = await providerRepo.create({
@@ -391,12 +410,21 @@ async function runWithSave(
 			});
 		}
 		providerIds.push(providerRecord.id);
-		providerMap.set(providerRecord.id, createProvider(pc));
+		providerMap.set(providerRecord.id, provider);
 		providerIdToConfig.set(providerRecord.id, pc);
 	}
 
 	// Create scorers
-	const scorers: IScorer[] = scorerConfigs.map((sc) => createScorer(sc));
+	const scorers: IScorer[] = scorerConfigs.map((sc) => {
+		const scorerOpts: CreateScorerOptions = {};
+		const providerName = sc.options?.provider as string | undefined;
+		if (providerName && providersByName.has(providerName)) {
+			scorerOpts.provider = providersByName.get(providerName);
+		} else if (providersByName.size > 0) {
+			scorerOpts.provider = providersByName.values().next().value;
+		}
+		return createScorer(sc, scorerOpts);
+	});
 
 	// Create eval run
 	if (spinner) spinner.text = "Running evaluation...";
