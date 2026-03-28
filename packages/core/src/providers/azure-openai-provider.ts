@@ -1,4 +1,5 @@
 import type { ProviderConfig } from "@llmbench/types";
+import { ConfigError, ErrorCode } from "@llmbench/types";
 import { OpenAICompatibleProvider } from "./openai-compatible-provider.js";
 
 /**
@@ -18,9 +19,11 @@ export class AzureOpenAIProvider extends OpenAICompatibleProvider {
 	constructor(config: ProviderConfig) {
 		const baseUrl = config.baseUrl;
 		if (!baseUrl) {
-			throw new Error(
+			throw new ConfigError(
+				ErrorCode.PROVIDER_INVALID_CONFIG,
 				"Azure OpenAI provider requires a baseUrl, e.g. " +
 					"https://{resource}.openai.azure.com/openai/deployments/{deployment}",
+				"baseUrl",
 			);
 		}
 		super(config, "azure-openai", "AZURE_OPENAI_API_KEY", baseUrl);

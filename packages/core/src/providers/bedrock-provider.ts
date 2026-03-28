@@ -5,6 +5,7 @@ import type {
 	TokenUsage,
 	ToolCall,
 } from "@llmbench/types";
+import { ErrorCode, ProviderError } from "@llmbench/types";
 import { AwsClient } from "aws4fetch";
 import { BaseProvider } from "./base-provider.js";
 import { parseBedrockEventStream } from "./streaming/bedrock-event-stream-parser.js";
@@ -37,10 +38,10 @@ export class BedrockProvider extends BaseProvider {
 		const sessionToken = (config.extra?.sessionToken as string) || process.env.AWS_SESSION_TOKEN;
 
 		if (!accessKeyId || !secretAccessKey) {
-			throw new Error(
-				"Bedrock provider requires AWS credentials. " +
-					"Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables " +
-					"or pass them in config.extra.",
+			throw new ProviderError(
+				ErrorCode.PROVIDER_AUTH_ERROR,
+				"Bedrock provider requires AWS credentials. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.",
+				{ providerName: this.name, providerType: this.type },
 			);
 		}
 
@@ -145,7 +146,11 @@ export class BedrockProvider extends BaseProvider {
 					(data.message as string) || JSON.stringify(data) || `HTTP ${response.status}`;
 
 				if (RETRYABLE_STATUS_CODES.has(response.status)) {
-					throw new Error(`Bedrock API error (${response.status}): ${errorMsg}`);
+					throw new ProviderError(
+						response.status === 429 ? ErrorCode.PROVIDER_RATE_LIMIT : ErrorCode.PROVIDER_API_ERROR,
+						`Bedrock API error (${response.status}): ${errorMsg}`,
+						{ providerName: this.name, providerType: this.type, statusCode: response.status },
+					);
 				}
 
 				return {
@@ -204,7 +209,7 @@ export class BedrockProvider extends BaseProvider {
 			};
 		} catch (error) {
 			const latencyMs = Date.now() - startTime;
-			if (error instanceof Error && error.message.startsWith("Bedrock API error")) {
+			if (error instanceof ProviderError) {
 				throw error;
 			}
 			return {
@@ -284,7 +289,11 @@ export class BedrockProvider extends BaseProvider {
 					(data.message as string) || JSON.stringify(data) || `HTTP ${response.status}`;
 
 				if (RETRYABLE_STATUS_CODES.has(response.status)) {
-					throw new Error(`Bedrock API error (${response.status}): ${errorMsg}`);
+					throw new ProviderError(
+						response.status === 429 ? ErrorCode.PROVIDER_RATE_LIMIT : ErrorCode.PROVIDER_API_ERROR,
+						`Bedrock API error (${response.status}): ${errorMsg}`,
+						{ providerName: this.name, providerType: this.type, statusCode: response.status },
+					);
 				}
 				return {
 					output: "",
@@ -295,7 +304,11 @@ export class BedrockProvider extends BaseProvider {
 			}
 
 			if (!response.body) {
-				throw new Error("Bedrock streaming response has no body");
+				throw new ProviderError(
+					ErrorCode.PROVIDER_API_ERROR,
+					"Bedrock streaming response has no body",
+					{ providerName: this.name, providerType: this.type },
+				);
 			}
 
 			for await (const event of parseBedrockEventStream(response.body)) {
@@ -330,7 +343,7 @@ export class BedrockProvider extends BaseProvider {
 			};
 		} catch (error) {
 			const latencyMs = Date.now() - startTime;
-			if (error instanceof Error && error.message.startsWith("Bedrock API error")) {
+			if (error instanceof ProviderError) {
 				throw error;
 			}
 			return {

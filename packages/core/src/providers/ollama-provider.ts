@@ -5,6 +5,7 @@ import type {
 	TokenUsage,
 	ToolCall,
 } from "@llmbench/types";
+import { ErrorCode, ProviderError } from "@llmbench/types";
 import { BaseProvider } from "./base-provider.js";
 import { parseNDJSON } from "./streaming/ndjson-parser.js";
 
@@ -156,7 +157,11 @@ export class OllamaProvider extends BaseProvider {
 			}
 
 			if (!response.body) {
-				throw new Error("Ollama streaming response has no body");
+				throw new ProviderError(
+					ErrorCode.PROVIDER_API_ERROR,
+					"Ollama streaming response has no body",
+					{ providerName: this.name, providerType: this.type },
+				);
 			}
 
 			interface OllamaChunk {
