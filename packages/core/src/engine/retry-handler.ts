@@ -1,4 +1,10 @@
-import { CancellationError } from "@llmbench/types";
+import {
+	CancellationError,
+	ConfigError,
+	ProviderError,
+	ScorerError,
+	TimeoutError,
+} from "@llmbench/types";
 
 export class RetryHandler {
 	private maxDelayMs: number;
@@ -24,6 +30,11 @@ export class RetryHandler {
 			} catch (error) {
 				lastError = error instanceof Error ? error : new Error(String(error));
 
+				// Bail immediately for non-retryable errors
+				if (!this.shouldRetry(lastError)) {
+					throw lastError;
+				}
+
 				if (attempt < this.maxRetries) {
 					const delay = Math.min(this.baseDelayMs * 2 ** attempt, this.maxDelayMs);
 					await this.abortableDelay(delay, signal);
@@ -32,6 +43,17 @@ export class RetryHandler {
 		}
 
 		throw lastError;
+	}
+
+	private shouldRetry(error: Error): boolean {
+		if (error instanceof CancellationError) return false;
+		if (error instanceof ConfigError) return false;
+		if (error instanceof ScorerError) return false;
+		if (error instanceof ProviderError) return error.isRetryable;
+		if (error instanceof TimeoutError) return true;
+
+		// Unknown errors: retry for backward compatibility
+		return true;
 	}
 
 	private abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
