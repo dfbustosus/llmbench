@@ -6,11 +6,9 @@ import type {
 	TokenUsage,
 	ToolCall,
 } from "@llmbench/types";
+import { ErrorCode, ProviderError } from "@llmbench/types";
 import { BaseProvider } from "./base-provider.js";
 import { parseSSE } from "./streaming/sse-parser.js";
-
-/** HTTP status codes that are worth retrying */
-const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 
 /**
  * Base class for providers with OpenAI-compatible chat/completions APIs.
@@ -101,16 +99,19 @@ export abstract class OpenAICompatibleProvider extends BaseProvider {
 				const errorMsg =
 					(err?.message as string) || JSON.stringify(data) || `HTTP ${response.status}`;
 
-				if (RETRYABLE_STATUS_CODES.has(response.status)) {
-					throw new Error(`${this.providerLabel} API error (${response.status}): ${errorMsg}`);
+				{
+					const code =
+						response.status === 429 ? ErrorCode.PROVIDER_RATE_LIMIT : ErrorCode.PROVIDER_API_ERROR;
+					throw new ProviderError(
+						code,
+						`${this.providerLabel} API error (${response.status}): ${errorMsg}`,
+						{
+							providerName: this.name,
+							providerType: this.type,
+							statusCode: response.status,
+						},
+					);
 				}
-
-				return {
-					output: "",
-					latencyMs,
-					tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
-					error: `${this.providerLabel} API error (${response.status}): ${errorMsg}`,
-				};
 			}
 
 			const choices = data.choices as Array<Record<string, unknown>> | undefined;
@@ -145,7 +146,7 @@ export abstract class OpenAICompatibleProvider extends BaseProvider {
 			};
 		} catch (error) {
 			const latencyMs = Date.now() - startTime;
-			if (error instanceof Error && error.message.startsWith(`${this.providerLabel} API error`)) {
+			if (error instanceof ProviderError) {
 				throw error;
 			}
 			return {
@@ -194,24 +195,31 @@ export abstract class OpenAICompatibleProvider extends BaseProvider {
 
 			if (!response.ok) {
 				const data = (await response.json()) as Record<string, unknown>;
-				const latencyMs = Date.now() - startTime;
 				const err = data.error as Record<string, unknown> | undefined;
 				const errorMsg =
 					(err?.message as string) || JSON.stringify(data) || `HTTP ${response.status}`;
 
-				if (RETRYABLE_STATUS_CODES.has(response.status)) {
-					throw new Error(`${this.providerLabel} API error (${response.status}): ${errorMsg}`);
+				{
+					const code =
+						response.status === 429 ? ErrorCode.PROVIDER_RATE_LIMIT : ErrorCode.PROVIDER_API_ERROR;
+					throw new ProviderError(
+						code,
+						`${this.providerLabel} API error (${response.status}): ${errorMsg}`,
+						{
+							providerName: this.name,
+							providerType: this.type,
+							statusCode: response.status,
+						},
+					);
 				}
-				return {
-					output: "",
-					latencyMs,
-					tokenUsage,
-					error: `${this.providerLabel} API error (${response.status}): ${errorMsg}`,
-				};
 			}
 
 			if (!response.body) {
-				throw new Error(`${this.providerLabel} streaming response has no body`);
+				throw new ProviderError(
+					ErrorCode.PROVIDER_API_ERROR,
+					`${this.providerLabel} streaming response has no body`,
+					{ providerName: this.name, providerType: this.type },
+				);
 			}
 
 			for await (const event of parseSSE(response.body)) {
@@ -248,7 +256,7 @@ export abstract class OpenAICompatibleProvider extends BaseProvider {
 			};
 		} catch (error) {
 			const latencyMs = Date.now() - startTime;
-			if (error instanceof Error && error.message.startsWith(`${this.providerLabel} API error`)) {
+			if (error instanceof ProviderError) {
 				throw error;
 			}
 			return {
