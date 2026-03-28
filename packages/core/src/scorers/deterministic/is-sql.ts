@@ -27,26 +27,30 @@ export class IsSqlScorer implements IScorer {
 			return this.fail("Output does not start with a recognized SQL keyword");
 		}
 
-		// Check balanced parentheses
+		// Single-pass check for balanced parentheses and unclosed string literals.
+		// Parentheses inside string literals are ignored.
+		// SQL escapes quotes by doubling: 'O''Brien' is valid.
 		let depth = 0;
-		for (const char of trimmed) {
-			if (char === "(") depth++;
-			if (char === ")") depth--;
-			if (depth < 0) return this.fail("Unbalanced parentheses");
-		}
-		if (depth !== 0) {
-			return this.fail("Unbalanced parentheses");
-		}
-
-		// Check for unclosed string literals (single quotes)
 		let inString = false;
 		for (let i = 0; i < trimmed.length; i++) {
-			if (trimmed[i] === "'" && (i === 0 || trimmed[i - 1] !== "'")) {
-				inString = !inString;
+			const ch = trimmed[i];
+			if (ch === "'") {
+				if (inString && i + 1 < trimmed.length && trimmed[i + 1] === "'") {
+					i++; // Skip escaped quote ('')
+				} else {
+					inString = !inString;
+				}
+			} else if (!inString) {
+				if (ch === "(") depth++;
+				if (ch === ")") depth--;
+				if (depth < 0) return this.fail("Unbalanced parentheses");
 			}
 		}
 		if (inString) {
 			return this.fail("Unclosed string literal");
+		}
+		if (depth !== 0) {
+			return this.fail("Unbalanced parentheses");
 		}
 
 		return {
