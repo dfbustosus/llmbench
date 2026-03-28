@@ -1,4 +1,5 @@
 import type { IProvider, IScorer, ScorerConfig } from "@llmbench/types";
+import { ErrorCode, ScorerError } from "@llmbench/types";
 import { GoalCompletionScorer } from "./agent/goal-completion.js";
 import { ToolCallAccuracyScorer } from "./agent/tool-call-accuracy.js";
 import { TrajectoryValidationScorer } from "./agent/trajectory-validation.js";
@@ -94,13 +95,19 @@ export function createScorer(config: ScorerConfig, options?: CreateScorerOptions
 			});
 		case "embedding-similarity": {
 			if (!options?.embedFn) {
-				throw new Error("Embedding similarity scorer requires an embedFn in options");
+				throw new ScorerError(
+					ErrorCode.SCORER_INVALID_CONFIG,
+					"Embedding similarity scorer requires an embedFn in options",
+				);
 			}
 			return new EmbeddingSimilarityScorer(options.embedFn);
 		}
 		case "llm-judge": {
 			if (!options?.provider) {
-				throw new Error("LLM judge scorer requires a provider in options");
+				throw new ScorerError(
+					ErrorCode.SCORER_INVALID_CONFIG,
+					"LLM judge scorer requires a provider in options",
+				);
 			}
 			return new LLMJudgeScorer(options.provider, {
 				name: config.name,
@@ -109,31 +116,46 @@ export function createScorer(config: ScorerConfig, options?: CreateScorerOptions
 		}
 		case "composite": {
 			if (!options?.components || options.components.length === 0) {
-				throw new Error("Composite scorer requires components in options");
+				throw new ScorerError(
+					ErrorCode.SCORER_INVALID_CONFIG,
+					"Composite scorer requires components in options",
+				);
 			}
 			return new WeightedAverageScorer(options.components, config.name);
 		}
 		case "context-precision": {
 			if (!options?.provider) {
-				throw new Error("Context precision scorer requires a provider in options");
+				throw new ScorerError(
+					ErrorCode.SCORER_INVALID_CONFIG,
+					"Context precision scorer requires a provider in options",
+				);
 			}
 			return new ContextPrecisionScorer(options.provider);
 		}
 		case "context-recall": {
 			if (!options?.provider) {
-				throw new Error("Context recall scorer requires a provider in options");
+				throw new ScorerError(
+					ErrorCode.SCORER_INVALID_CONFIG,
+					"Context recall scorer requires a provider in options",
+				);
 			}
 			return new ContextRecallScorer(options.provider);
 		}
 		case "faithfulness": {
 			if (!options?.provider) {
-				throw new Error("Faithfulness scorer requires a provider in options");
+				throw new ScorerError(
+					ErrorCode.SCORER_INVALID_CONFIG,
+					"Faithfulness scorer requires a provider in options",
+				);
 			}
 			return new FaithfulnessScorer(options.provider);
 		}
 		case "answer-relevancy": {
 			if (!options?.provider) {
-				throw new Error("Answer relevancy scorer requires a provider in options");
+				throw new ScorerError(
+					ErrorCode.SCORER_INVALID_CONFIG,
+					"Answer relevancy scorer requires a provider in options",
+				);
 			}
 			return new AnswerRelevancyScorer(options.provider, {
 				numQuestions: opts.numQuestions as number | undefined,
@@ -145,11 +167,18 @@ export function createScorer(config: ScorerConfig, options?: CreateScorerOptions
 			return new TrajectoryValidationScorer();
 		case "goal-completion": {
 			if (!options?.provider) {
-				throw new Error("Goal completion scorer requires a provider in options");
+				throw new ScorerError(
+					ErrorCode.SCORER_INVALID_CONFIG,
+					"Goal completion scorer requires a provider in options",
+				);
 			}
 			return new GoalCompletionScorer(options.provider);
 		}
 		default:
-			throw new Error(`Unknown scorer type: ${config.type}`);
+			throw new ScorerError(
+				ErrorCode.SCORER_NOT_FOUND,
+				`Unknown scorer type: ${config.type}`,
+				config.type,
+			);
 	}
 }

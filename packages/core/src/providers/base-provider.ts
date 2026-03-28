@@ -8,6 +8,7 @@ import type {
 	ToolChoice,
 	ToolDefinition,
 } from "@llmbench/types";
+import { ConfigError, ErrorCode, ProviderError } from "@llmbench/types";
 
 export abstract class BaseProvider implements IProvider {
 	readonly type: ProviderType;
@@ -20,9 +21,24 @@ export abstract class BaseProvider implements IProvider {
 	protected config: ProviderConfig;
 
 	constructor(config: ProviderConfig) {
-		if (!config.type) throw new Error("Provider config must have a 'type'");
-		if (!config.name) throw new Error("Provider config must have a 'name'");
-		if (!config.model) throw new Error("Provider config must have a 'model'");
+		if (!config.type)
+			throw new ConfigError(
+				ErrorCode.CONFIG_VALIDATION,
+				"Provider config must have a 'type'",
+				"type",
+			);
+		if (!config.name)
+			throw new ConfigError(
+				ErrorCode.CONFIG_VALIDATION,
+				"Provider config must have a 'name'",
+				"name",
+			);
+		if (!config.model)
+			throw new ConfigError(
+				ErrorCode.CONFIG_VALIDATION,
+				"Provider config must have a 'model'",
+				"model",
+			);
 
 		this.type = config.type;
 		this.name = config.name;
@@ -78,9 +94,11 @@ export abstract class BaseProvider implements IProvider {
 	protected resolveApiKey(configKey: string | undefined, envVar: string): string {
 		const key = configKey || process.env[envVar];
 		if (!key) {
-			throw new Error(
+			throw new ProviderError(
+				ErrorCode.PROVIDER_AUTH_ERROR,
 				`API key required for ${this.name} (${this.type}). ` +
 					`Set ${envVar} environment variable or pass apiKey in config.`,
+				{ providerName: this.name, providerType: this.type },
 			);
 		}
 		return key;

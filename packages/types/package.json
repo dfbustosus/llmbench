@@ -32,6 +32,10 @@
 			"types": "./dist/scoring.d.ts",
 			"import": "./dist/scoring.js"
 		},
+		"./errors": {
+			"types": "./dist/errors.d.ts",
+			"import": "./dist/errors.js"
+		},
 		"./evaluation": {
 			"types": "./dist/evaluation.d.ts",
 			"import": "./dist/evaluation.js"

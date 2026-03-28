@@ -5,6 +5,7 @@ import type {
 	TokenUsage,
 	ToolCall,
 } from "@llmbench/types";
+import { ErrorCode, ProviderError } from "@llmbench/types";
 import { BaseProvider } from "./base-provider.js";
 import { parseSSE } from "./streaming/sse-parser.js";
 
@@ -228,7 +229,11 @@ export class GoogleProvider extends BaseProvider {
 			}
 
 			if (!response.body) {
-				throw new Error("Google streaming response has no body");
+				throw new ProviderError(
+					ErrorCode.PROVIDER_API_ERROR,
+					"Google streaming response has no body",
+					{ providerName: this.name, providerType: this.type },
+				);
 			}
 
 			for await (const event of parseSSE(response.body)) {

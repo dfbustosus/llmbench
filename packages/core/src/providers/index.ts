@@ -1,4 +1,5 @@
 import type { IProvider, ProviderConfig } from "@llmbench/types";
+import { ConfigError, ErrorCode } from "@llmbench/types";
 import { AnthropicProvider } from "./anthropic-provider.js";
 import { AzureOpenAIProvider } from "./azure-openai-provider.js";
 import { BedrockProvider } from "./bedrock-provider.js";
@@ -42,9 +43,13 @@ export function createProvider(config: ProviderConfig, customFn?: CustomGenerate
 		case "ollama":
 			return new OllamaProvider(config);
 		case "custom":
-			if (!customFn) throw new Error("Custom provider requires a generate function");
+			if (!customFn)
+				throw new ConfigError(
+					ErrorCode.PROVIDER_INVALID_CONFIG,
+					"Custom provider requires a generate function",
+				);
 			return new CustomProvider(config, customFn);
 		default:
-			throw new Error(`Unknown provider type: ${config.type}`);
+			throw new ConfigError(ErrorCode.PROVIDER_NOT_FOUND, `Unknown provider type: ${config.type}`);
 	}
 }
