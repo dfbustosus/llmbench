@@ -3,6 +3,7 @@ export * from "./comparison.js";
 export * from "./config.js";
 export * from "./cost.js";
 export * from "./dataset.js";
+export * from "./errors.js";
 export * from "./evaluation.js";
 export * from "./events.js";
 export * from "./gate.js";
