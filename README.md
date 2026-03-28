@@ -37,7 +37,7 @@ npx @llmbench/cli eval "What is the capital of France?" -p openai:gpt-4o -p anth
 ## Features
 
 - **9 providers** — OpenAI, Anthropic, Google AI, Mistral, Together AI, AWS Bedrock, Azure OpenAI, Ollama, or fully custom providers. Compare side-by-side.
-- **19 built-in scorers** — Deterministic (exact match, contains, regex, JSON match, JSON schema), semantic (cosine similarity, Levenshtein, BLEU, ROUGE, embedding similarity), RAG (context precision, context recall, faithfulness, answer relevancy), agent (tool call accuracy, trajectory validation, goal completion), LLM-as-judge, and weighted composite.
+- **23 built-in scorers** — Deterministic (exact match, contains, regex, JSON match, JSON schema, is-json, is-sql, is-xml, is-valid-function-call), semantic (cosine similarity, Levenshtein, BLEU, ROUGE, embedding similarity), RAG (context precision, context recall, faithfulness, answer relevancy), agent (tool call accuracy, trajectory validation, goal completion), LLM-as-judge, and weighted composite.
 - **Per-test-case assertions** — Override global scorers on individual test cases with inline `assert` rules. Test different criteria per prompt.
 - **Graceful cancellation** — Press Ctrl+C for cooperative cancellation that lets in-flight API calls finish. Double Ctrl+C to force quit. Cancel stuck runs from the web dashboard. Full `AbortSignal` support in the SDK.
 - **Quick eval mode** — `llmbench eval "prompt" -p openai:gpt-4o` — test a single prompt ad-hoc without creating files.
@@ -315,6 +315,10 @@ API keys are read from environment variables only. They are never stored in the 
 | Regex | `regex` | Deterministic | Pattern matching with configurable flags |
 | JSON Match | `json-match` | Deterministic | Deep JSON comparison with partial matching support |
 | JSON Schema | `json-schema` | Deterministic | Validates output against a JSON schema |
+| Is JSON | `is-json` | Deterministic | Validates output is parseable JSON (optional strict mode) |
+| Is SQL | `is-sql` | Deterministic | Heuristic SQL validation (keyword, parens, strings) |
+| Is XML | `is-xml` | Deterministic | Stack-based XML well-formedness check |
+| Is Valid Function Call | `is-valid-function-call` | Deterministic | Validates function call JSON structure |
 | Cosine Similarity | `cosine-similarity` | Semantic | Token-based vector similarity (0-1) |
 | Levenshtein | `levenshtein` | Semantic | Edit-distance-based similarity (0-1) |
 | BLEU | `bleu` | Semantic | Machine translation quality metric |
