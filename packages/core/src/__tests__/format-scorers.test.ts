@@ -126,6 +126,14 @@ describe("IsSqlScorer", () => {
 		expect((await scorer.score("SELECT * FROM users WHERE name = 'Alice", "")).value).toBe(0);
 	});
 
+	it("should return 1 for SQL-escaped quotes", async () => {
+		expect((await scorer.score("SELECT * FROM users WHERE name = 'O''Brien'", "")).value).toBe(1);
+	});
+
+	it("should ignore parentheses inside string literals", async () => {
+		expect((await scorer.score("SELECT * FROM users WHERE name = '(test'", "")).value).toBe(1);
+	});
+
 	it("should return 1 for nested parentheses", async () => {
 		expect(
 			(await scorer.score("SELECT * FROM (SELECT id FROM (SELECT id FROM t))", "")).value,
