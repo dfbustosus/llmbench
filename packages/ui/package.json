@@ -1,6 +1,6 @@
 {
 	"name": "@llmbench/ui",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"description": "UI component library for LLMBench dashboard",
 	"type": "module",
 	"license": "Apache-2.0",
