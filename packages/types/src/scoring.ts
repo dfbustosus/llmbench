@@ -28,7 +28,11 @@ export type ScorerType =
 	| "answer-relevancy"
 	| "tool-call-accuracy"
 	| "trajectory-validation"
-	| "goal-completion";
+	| "goal-completion"
+	| "is-json"
+	| "is-sql"
+	| "is-xml"
+	| "is-valid-function-call";
 
 export interface ScorerConfig {
 	id: string;

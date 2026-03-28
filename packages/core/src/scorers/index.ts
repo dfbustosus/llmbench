@@ -5,6 +5,10 @@ import { TrajectoryValidationScorer } from "./agent/trajectory-validation.js";
 import { WeightedAverageScorer } from "./composite/weighted-average.js";
 import { ContainsScorer } from "./deterministic/contains.js";
 import { ExactMatchScorer } from "./deterministic/exact-match.js";
+import { IsJsonScorer } from "./deterministic/is-json.js";
+import { IsSqlScorer } from "./deterministic/is-sql.js";
+import { IsValidFunctionCallScorer } from "./deterministic/is-valid-function-call.js";
+import { IsXmlScorer } from "./deterministic/is-xml.js";
 import { JsonMatchScorer } from "./deterministic/json-match.js";
 import { JsonSchemaScorer } from "./deterministic/json-schema.js";
 import { RegexScorer } from "./deterministic/regex.js";
@@ -62,6 +66,16 @@ export function createScorer(config: ScorerConfig, options?: CreateScorerOptions
 			return new JsonSchemaScorer({
 				strict: opts.strict as boolean | undefined,
 			});
+		case "is-json":
+			return new IsJsonScorer({
+				strict: opts.strict as boolean | undefined,
+			});
+		case "is-sql":
+			return new IsSqlScorer();
+		case "is-xml":
+			return new IsXmlScorer();
+		case "is-valid-function-call":
+			return new IsValidFunctionCallScorer();
 		case "cosine-similarity":
 			return new CosineSimilarityScorer();
 		case "levenshtein":

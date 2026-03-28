@@ -68,6 +68,10 @@ const VALID_SCORER_TYPES = new Set<string>([
 	"tool-call-accuracy",
 	"trajectory-validation",
 	"goal-completion",
+	"is-json",
+	"is-sql",
+	"is-xml",
+	"is-valid-function-call",
 ]);
 
 export function parseProviderShorthand(shorthand: string): ProviderConfig {
