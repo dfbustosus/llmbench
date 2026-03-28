@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] - 2026-03-27
+
+### Added
+
+- **Format validation scorers** — 4 deterministic scorers for output format assertions
+  - `is-json` — validates output is parseable JSON, optional strict mode rejects primitives
+  - `is-sql` — heuristic SQL validation (keyword, balanced parentheses, closed string literals)
+  - `is-xml` — stack-based XML tag matching with declaration/comment stripping
+  - `is-valid-function-call` — validates JSON with `function.name` + `function.arguments` structure
+  - All 4 can be used as inline per-test-case assertions (deterministic, no provider needed)
+- **Typed error hierarchy** — `LLMBenchError` base class with string error codes
+  - `ConfigError` — config validation, missing files (`CONFIG_NOT_FOUND`, `CONFIG_VALIDATION`)
+  - `ProviderError` — API failures with `statusCode`, `providerName`, and `isRetryable` getter (`PROVIDER_API_ERROR`, `PROVIDER_AUTH_ERROR`, `PROVIDER_RATE_LIMIT`)
+  - `ScorerError` — missing dependencies, unknown types (`SCORER_NOT_FOUND`, `SCORER_INVALID_CONFIG`, `SCORER_UNSUPPORTED_INLINE`)
+  - `TimeoutError` — operation exceeded time limit (`TIMEOUT`)
+  - `ErrorCode` const object with 12 string codes for programmatic `switch`/`if` handling
+  - All classes exported from `@llmbench/types` and `@llmbench/types/errors` subpath
+
+### Fixed
+
+- `RetryHandler` now bails immediately on non-retryable errors instead of wasting time on exponential backoff. `ConfigError`, `ScorerError`, and `ProviderError(401/403)` are never retried. Previously ALL errors were retried 3x with backoff — wasting 7+ seconds on errors that could never succeed.
+- SQL scorer handles SQL-escaped quotes (`'O''Brien'`) correctly
+- SQL scorer ignores parentheses inside string literals
+
+### Changed
+
+- Scorer count increased from 19 to 23 (4 format validators)
+- 61 `throw new Error()` calls migrated to typed errors across providers, config-loader, and scorer factory
+- `RetryHandler` uses `shouldRetry()` method with `instanceof` checks instead of retrying all errors
+- Provider API error throws now carry HTTP status code for programmatic retry decisions
+
 ## [1.0.3] - 2026-03-26
 
 ### Added
