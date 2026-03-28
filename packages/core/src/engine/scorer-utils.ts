@@ -1,4 +1,5 @@
 import type { IScorer, ScorerConfig, TestCaseAssertion } from "@llmbench/types";
+import { ErrorCode, ScorerError } from "@llmbench/types";
 import { createScorer } from "../scorers/index.js";
 
 const UNSUPPORTED_INLINE_TYPES = new Set([
@@ -18,9 +19,11 @@ const UNSUPPORTED_INLINE_TYPES = new Set([
  */
 export function createScorerFromAssertion(assertion: TestCaseAssertion): IScorer {
 	if (UNSUPPORTED_INLINE_TYPES.has(assertion.type)) {
-		throw new Error(
+		throw new ScorerError(
+			ErrorCode.SCORER_UNSUPPORTED_INLINE,
 			`Scorer type "${assertion.type}" cannot be used as an inline assertion. ` +
 				"Define it as a global scorer in your config instead.",
+			assertion.type,
 		);
 	}
 
