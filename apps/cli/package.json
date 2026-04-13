@@ -48,7 +48,7 @@
 		"ora": "^8.2.0",
 		"chalk": "^5.4.1",
 		"cli-table3": "^0.6.5",
-		"nanoid": "^5.1.5"
+		"nanoid": "^5.1.7"
 	},
 	"devDependencies": {
 		"tsx": "^4.21.0",
