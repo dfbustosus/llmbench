@@ -85,6 +85,18 @@ export function useRunEvents(runId: string, enabled: boolean): RunEventState {
 			}));
 		});
 
+		es.addEventListener("run:cancelled", (e) => {
+			const data = JSON.parse(e.data);
+			setState((prev) => ({
+				...prev,
+				isLive: false,
+				completedCases: data.completedCases,
+				totalCases: data.totalCases,
+				failedCases: data.failedCases,
+				latestEventType: "run:cancelled",
+			}));
+		});
+
 		es.addEventListener("rescore:completed", () => {
 			setState((prev) => ({
 				...prev,
