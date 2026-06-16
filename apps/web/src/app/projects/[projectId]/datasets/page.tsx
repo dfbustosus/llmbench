@@ -54,6 +54,12 @@ export default function DatasetsPage({ params }: { params: Promise<{ projectId: 
 				<a href={`/projects/${projectId}/datasets`} className="font-medium text-primary">
 					Datasets
 				</a>
+				<a
+					href={`/projects/${projectId}/providers`}
+					className="text-muted-foreground hover:text-foreground"
+				>
+					Providers
+				</a>
 			</div>
 
 			<div className="grid gap-4 md:grid-cols-2">
