@@ -1,4 +1,4 @@
-import { RunComparator } from "@llmbench/core";
+import { RunComparator } from "@llmbench/core/comparison";
 import { z } from "zod";
 import { getRepos, publicProcedure, router } from "../server";
 
