@@ -60,6 +60,12 @@ export default function RunsPage({ params }: { params: Promise<{ projectId: stri
 				>
 					Datasets
 				</a>
+				<a
+					href={`/projects/${projectId}/providers`}
+					className="text-muted-foreground hover:text-foreground"
+				>
+					Providers
+				</a>
 			</div>
 
 			{/* Score Trend */}
