@@ -3,7 +3,12 @@ import { getDB } from "@/trpc/server";
 
 const POLL_INTERVAL_MS = 500;
 const KEEPALIVE_INTERVAL_MS = 15_000;
-const TERMINAL_EVENTS = new Set(["run:completed", "run:failed", "rescore:completed"]);
+const TERMINAL_EVENTS = new Set([
+	"run:completed",
+	"run:failed",
+	"run:cancelled",
+	"rescore:completed",
+]);
 
 export async function GET(req: Request, { params }: { params: Promise<{ runId: string }> }) {
 	const { runId } = await params;
