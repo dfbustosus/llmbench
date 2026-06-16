@@ -48,5 +48,5 @@ function ConfirmDialog({
 	);
 }
 
-export { ConfirmDialog };
 export type { ConfirmDialogProps };
+export { ConfirmDialog };
