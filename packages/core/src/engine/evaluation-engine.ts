@@ -167,6 +167,11 @@ export class EvaluationEngine {
 							};
 						}
 
+						configOverrides = {
+							...configOverrides,
+							timeoutMs: config.timeoutMs,
+						};
+
 						// Include tools config in overrides for cache key differentiation
 						if (provider.tools) {
 							configOverrides = { ...configOverrides, tools: provider.tools };
