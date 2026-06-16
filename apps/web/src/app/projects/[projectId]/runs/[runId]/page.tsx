@@ -27,6 +27,7 @@ export default function RunDetailPage({
 	const router = useRouter();
 	const [deleteOpen, setDeleteOpen] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
+	const [cancelError, setCancelError] = useState<string | null>(null);
 
 	const deleteMutation = trpc.evalRun.delete.useMutation({
 		onSuccess: () => {
@@ -37,8 +38,10 @@ export default function RunDetailPage({
 
 	const cancelMutation = trpc.evalRun.cancel.useMutation({
 		onSuccess: () => {
+			setCancelError(null);
 			runQuery.refetch();
 		},
+		onError: (err) => setCancelError(err.message),
 	});
 
 	const runQuery = trpc.evalRun.getById.useQuery(runId);
@@ -163,6 +166,7 @@ export default function RunDetailPage({
 					</span>
 				)}
 			</div>
+			{cancelError && <p className="text-sm text-destructive">{cancelError}</p>}
 
 			{/* Progress bar for active runs */}
 			{eventState.isLive && eventState.totalCases > 0 && (
