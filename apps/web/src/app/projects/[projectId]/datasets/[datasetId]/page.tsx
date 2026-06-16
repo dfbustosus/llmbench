@@ -12,6 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import { use, useState } from "react";
 import { AddTestCaseDialog } from "@/components/datasets/add-test-case-dialog";
+import { StartRunDialog } from "@/components/runs/start-run-dialog";
 import { trpc } from "@/trpc/client";
 
 export default function DatasetDetailPage({
@@ -29,6 +30,7 @@ export default function DatasetDetailPage({
 	const testCases = testCasesQuery.data ?? [];
 
 	const [addOpen, setAddOpen] = useState(false);
+	const [startRunOpen, setStartRunOpen] = useState(false);
 	const [deleteOpen, setDeleteOpen] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -67,6 +69,9 @@ export default function DatasetDetailPage({
 				</a>
 				<span className="text-muted-foreground">/</span>
 				<h1 className="text-2xl font-bold">{dataset.name}</h1>
+				<Button size="sm" onClick={() => setStartRunOpen(true)}>
+					Run Evaluation
+				</Button>
 			</div>
 
 			<Card>
@@ -138,6 +143,13 @@ export default function DatasetDetailPage({
 			)}
 
 			<AddTestCaseDialog open={addOpen} onOpenChange={setAddOpen} datasetId={datasetId} />
+			<StartRunDialog
+				open={startRunOpen}
+				onOpenChange={setStartRunOpen}
+				projectId={projectId}
+				datasetId={datasetId}
+				datasetName={dataset.name}
+			/>
 			<ConfirmDialog
 				open={deleteOpen}
 				onOpenChange={(open) => {
