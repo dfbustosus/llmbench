@@ -227,6 +227,75 @@ describe("Integration: full evaluation pipeline", () => {
 		expect(results[0].error).toBe("Rate limit exceeded");
 	});
 
+	it("should pass run timeoutMs to providers", async () => {
+		const db = createInMemoryDB();
+		initializeDB(db);
+
+		const projectRepo = new ProjectRepository(db);
+		const datasetRepo = new DatasetRepository(db);
+		const testCaseRepo = new TestCaseRepository(db);
+		const providerRepo = new ProviderRepository(db);
+		const evalRunRepo = new EvalRunRepository(db);
+		const evalResultRepo = new EvalResultRepository(db);
+		const scoreRepo = new ScoreRepository(db);
+		const costRecordRepo = new CostRecordRepository(db);
+
+		const project = await projectRepo.create({ name: "Timeout Project" });
+		const dataset = await datasetRepo.create({ projectId: project.id, name: "Timeout Dataset" });
+		const testCase = await testCaseRepo.create({
+			datasetId: dataset.id,
+			input: "ping",
+			expected: "pong",
+		});
+		const providerRecord = await providerRepo.create({
+			projectId: project.id,
+			type: "custom",
+			name: "TimeoutLLM",
+			model: "timeout-v1",
+			config: {},
+		});
+
+		let receivedTimeoutMs: number | undefined;
+		const provider = new CustomProvider(
+			{ type: "custom", name: "TimeoutLLM", model: "timeout-v1" },
+			async (_input, config) => {
+				receivedTimeoutMs = config.timeoutMs;
+				return {
+					output: "pong",
+					latencyMs: 1,
+					tokenUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+				};
+			},
+		);
+
+		const engine = new EvaluationEngine({
+			providers: new Map([[providerRecord.id, provider]]),
+			scorers: [new ExactMatchScorer()],
+			evalRunRepo,
+			evalResultRepo,
+			scoreRepo,
+			costRecordRepo,
+			costCalculator: new CostCalculator(),
+		});
+
+		const run = await evalRunRepo.create({
+			projectId: project.id,
+			datasetId: dataset.id,
+			config: {
+				providerIds: [providerRecord.id],
+				scorerConfigs: [],
+				concurrency: 1,
+				maxRetries: 0,
+				timeoutMs: 12345,
+			},
+			totalCases: 1,
+		});
+
+		await engine.execute(run, [testCase]);
+
+		expect(receivedTimeoutMs).toBe(12345);
+	});
+
 	it("should use cache to skip provider calls on second run", async () => {
 		const db = createInMemoryDB();
 		initializeDB(db);
