@@ -41,18 +41,18 @@
 		"prepublishOnly": "pnpm run build"
 	},
 	"dependencies": {
-		"@llmbench/types": "workspace:*",
-		"@llmbench/db": "workspace:*",
 		"@llmbench/core": "workspace:*",
-		"commander": "^13.1.0",
-		"ora": "^8.2.0",
+		"@llmbench/db": "workspace:*",
+		"@llmbench/types": "workspace:*",
 		"chalk": "^5.4.1",
 		"cli-table3": "^0.6.5",
-		"nanoid": "^5.1.5"
+		"commander": "^13.1.0",
+		"nanoid": "^5.1.11",
+		"ora": "^8.2.0"
 	},
 	"devDependencies": {
-		"tsx": "^4.21.0",
+		"tsx": "^4.22.4",
 		"typescript": "^5.9.3",
-		"vitest": "^4.0.18"
+		"vitest": "^4.1.9"
 	}
 }
