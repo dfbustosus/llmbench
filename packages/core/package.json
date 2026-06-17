@@ -17,7 +17,15 @@
 	"types": "./dist/index.d.ts",
 	"sideEffects": false,
 	"files": [
-		"dist"
+		"dist/comparison",
+		"dist/config",
+		"dist/cost",
+		"dist/engine",
+		"dist/gate",
+		"dist/providers",
+		"dist/scorers",
+		"dist/sdk",
+		"dist/index.*"
 	],
 	"exports": {
 		".": {
