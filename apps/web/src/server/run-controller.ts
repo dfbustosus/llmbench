@@ -10,7 +10,8 @@ import {
 	EventRepository,
 	ScoreRepository,
 } from "@llmbench/db";
-import type { EvalEvent, EvalRun, IProvider, ProviderConfig, ScorerConfig } from "@llmbench/types";
+import type { EvalEvent, EvalRun, IProvider, ScorerConfig } from "@llmbench/types";
+import { providerConfigFromRecord } from "@/server/provider-config";
 import { getDB, getRepos } from "@/trpc/server";
 
 const WEB_RUN_TAG = "source:web";
@@ -42,20 +43,6 @@ export interface StartEvaluationRunInput {
 export interface CancelEvaluationRunResult {
 	cancelled: boolean;
 	managed: boolean;
-}
-
-function providerConfigFromRecord(record: {
-	type: ProviderConfig["type"];
-	name: string;
-	model: string;
-	config?: Partial<ProviderConfig>;
-}): ProviderConfig {
-	return {
-		...record.config,
-		type: record.type,
-		name: record.name,
-		model: record.model,
-	};
 }
 
 function createRunFailedEvent(runId: string, error: unknown): EvalEvent {
