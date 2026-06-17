@@ -1,6 +1,12 @@
+import { createProvider } from "@llmbench/core/providers";
 import type { ProviderConfig, ProviderType } from "@llmbench/types";
 import { z } from "zod";
+import { providerConfigFromRecord } from "@/server/provider-config";
 import { getRepos, publicProcedure, router } from "../server";
+
+const CONNECTION_TEST_PROMPT = "Return a short JSON object with ok set to true.";
+const CONNECTION_TEST_MAX_TOKENS = 32;
+const CONNECTION_TEST_TIMEOUT_MS = 10_000;
 
 const dashboardProviderTypes = [
 	"openai",
@@ -114,4 +120,39 @@ export const providerRouter = router({
 	delete: publicProcedure.input(z.string()).mutation(async ({ input }) => {
 		return getRepos().provider.delete(input);
 	}),
+
+	testConnection: publicProcedure
+		.input(
+			z.object({ id: z.string(), timeoutMs: z.number().int().min(1000).max(30000).optional() }),
+		)
+		.mutation(async ({ input }) => {
+			const record = await getRepos().provider.findById(input.id);
+			if (!record) {
+				throw new Error("Provider not found");
+			}
+			if (record.type === "custom") {
+				throw new Error(
+					"Custom providers require SDK/CLI code and cannot be tested from the dashboard.",
+				);
+			}
+
+			const provider = createProvider(providerConfigFromRecord(record));
+			const response = await provider.generate(CONNECTION_TEST_PROMPT, {
+				temperature: 0,
+				maxTokens: CONNECTION_TEST_MAX_TOKENS,
+				stream: false,
+				timeoutMs: input.timeoutMs ?? CONNECTION_TEST_TIMEOUT_MS,
+			});
+
+			if (response.error) {
+				throw new Error(response.error);
+			}
+
+			return {
+				ok: true,
+				latencyMs: response.latencyMs,
+				output: response.output.slice(0, 200),
+				tokenUsage: response.tokenUsage,
+			};
+		}),
 });
