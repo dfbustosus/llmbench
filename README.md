@@ -269,7 +269,7 @@ LLMBENCH_DB_PATH=./llmbench.db llmbench serve -p 3000
 
 ### Local Evaluation Studio
 
-`llmbench serve` launches the Next.js dashboard against your local SQLite database. It resolves the database path using `--db`, then `LLMBENCH_DB_PATH`, then `./llmbench.db`, and prints the resolved path on startup. The dashboard starts in production mode when the web app is already built, otherwise it uses development mode. If you run from a non-standard checkout, set `LLMBENCH_WEB_DIR` to the web app directory.
+`llmbench serve` launches the Next.js dashboard against your local SQLite database. It resolves the database path using `--db`, then `LLMBENCH_DB_PATH`, then `./llmbench.db`, and prints the resolved path on startup. The dashboard starts in production mode when the web app is already built, otherwise it uses development mode. If you run from a non-standard checkout, pass `--web-dir` or set `LLMBENCH_WEB_DIR` to the web app directory.
 
 Typical workflow:
 
