@@ -206,6 +206,18 @@ llmbench serve -p 8080           # custom port
 llmbench serve --db ./custom.db  # custom database
 ```
 
+The dashboard uses the same SQLite database as CLI runs. Database path precedence is:
+`--db` > `LLMBENCH_DB_PATH` > `./llmbench.db`.
+
+`serve` prints the resolved database path, dashboard URL, and whether it is starting the web app in development or production mode. It uses production mode when `apps/web/.next` exists, otherwise it starts the Next.js dev server. If you run the CLI outside the monorepo layout, set `LLMBENCH_WEB_DIR` to the web app directory.
+
+```bash
+LLMBENCH_DB_PATH=./team-evals.db llmbench serve
+LLMBENCH_WEB_DIR=./apps/web llmbench serve --db ./studio.db -p 8080
+```
+
+If the selected port is already in use, choose another port with `--port`.
+
 ## Configuration
 
 LLMBench searches for config files in order: `llmbench.config.ts` > `.js` > `.mjs` > `.yaml` > `.yml`. Override with `--config <path>`.
