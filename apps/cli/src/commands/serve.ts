@@ -9,6 +9,7 @@ import { Command } from "commander";
 interface ServeOptions {
 	port?: string;
 	db?: string;
+	webDir?: string;
 }
 
 export interface ServePlan {
@@ -49,12 +50,14 @@ export function findWebAppDirectory(
 	importMetaUrl: string,
 	cwd: string,
 	env: NodeJS.ProcessEnv,
+	webDirInput?: string,
 ): string {
-	const explicitWebDir = env.LLMBENCH_WEB_DIR;
+	const explicitWebDir = webDirInput ?? env.LLMBENCH_WEB_DIR;
 	if (explicitWebDir) {
 		const resolved = resolve(cwd, explicitWebDir);
 		if (!hasWebPackage(resolved)) {
-			throw new Error(`LLMBENCH_WEB_DIR does not point to a web package: ${resolved}`);
+			const source = webDirInput ? "--web-dir" : "LLMBENCH_WEB_DIR";
+			throw new Error(`${source} does not point to a web package: ${resolved}`);
 		}
 		return resolved;
 	}
@@ -70,7 +73,7 @@ export function findWebAppDirectory(
 	if (!webDir) {
 		throw new Error(
 			"Could not locate the LLMBench web dashboard package. " +
-				"Run from the monorepo root or set LLMBENCH_WEB_DIR to apps/web.",
+				"Run from the monorepo root, pass --web-dir, or set LLMBENCH_WEB_DIR to apps/web.",
 		);
 	}
 
@@ -106,7 +109,7 @@ export function createServePlan(
 ): ServePlan {
 	const port = parseServePort(options.port);
 	const dbPath = resolveServeDbPath(options.db, env, cwd);
-	const webDir = findWebAppDirectory(importMetaUrl, cwd, env);
+	const webDir = findWebAppDirectory(importMetaUrl, cwd, env, options.webDir);
 	return {
 		port,
 		dbPath,
@@ -144,6 +147,7 @@ export const serveCommand = new Command("serve")
 	.description("Start the LLMBench web dashboard")
 	.option("-p, --port <number>", "Port number", "3000")
 	.option("--db <path>", "Database path. Defaults to LLMBENCH_DB_PATH or ./llmbench.db")
+	.option("--web-dir <path>", "Web dashboard package directory. Defaults to LLMBENCH_WEB_DIR")
 	.action(async (options: ServeOptions) => {
 		try {
 			const plan = createServePlan(options, process.env, process.cwd());
@@ -162,7 +166,7 @@ export const serveCommand = new Command("serve")
 			console.error(error instanceof Error ? error.message : String(error));
 			console.error();
 			console.error(chalk.dim("Tips:"));
-			console.error(chalk.dim("  - Run from the LLMBench monorepo root, or set LLMBENCH_WEB_DIR."));
+			console.error(chalk.dim("  - Run from the LLMBench monorepo root, or pass --web-dir."));
 			console.error(chalk.dim("  - Run pnpm install if dependencies are missing."));
 			console.error(chalk.dim("  - Run pnpm --filter @llmbench/web build for production mode."));
 			process.exitCode = 1;
