@@ -262,7 +262,23 @@ llmbench compare abc123 def456 --fail-on-regression --min-severity medium
 
 # Export results
 llmbench run -d data.json -o results.json   # or .csv or .html
+
+# Launch the local dashboard against a specific SQLite database
+LLMBENCH_DB_PATH=./llmbench.db llmbench serve -p 3000
 ```
+
+### Local Evaluation Studio
+
+`llmbench serve` launches the Next.js dashboard against your local SQLite database. It resolves the database path using `--db`, then `LLMBENCH_DB_PATH`, then `./llmbench.db`, and prints the resolved path on startup. The dashboard starts in production mode when the web app is already built, otherwise it uses development mode. If you run from a non-standard checkout, set `LLMBENCH_WEB_DIR` to the web app directory.
+
+Typical workflow:
+
+```bash
+llmbench init
+llmbench serve
+```
+
+Then open the dashboard, add project providers, test provider connections, create/import datasets, start runs, and inspect live progress/results.
 
 ## Programmatic SDK
 
