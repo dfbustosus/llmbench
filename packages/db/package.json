@@ -17,7 +17,12 @@
 	"types": "./dist/index.d.ts",
 	"sideEffects": false,
 	"files": [
-		"dist"
+		"dist/migrations",
+		"dist/repositories",
+		"dist/schema",
+		"dist/client.*",
+		"dist/constants.*",
+		"dist/index.*"
 	],
 	"exports": {
 		".": {
