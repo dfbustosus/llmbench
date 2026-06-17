@@ -30,7 +30,11 @@
 		"llmbench": "./dist/index.js"
 	},
 	"files": [
-		"dist"
+		"dist/commands",
+		"dist/exporters",
+		"dist/renderers",
+		"dist/templates",
+		"dist/index.*"
 	],
 	"scripts": {
 		"build": "tsc",
