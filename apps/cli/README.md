@@ -204,15 +204,17 @@ Launch the web dashboard.
 llmbench serve                   # localhost:3000
 llmbench serve -p 8080           # custom port
 llmbench serve --db ./custom.db  # custom database
+llmbench serve --web-dir ./apps/web
 ```
 
 The dashboard uses the same SQLite database as CLI runs. Database path precedence is:
 `--db` > `LLMBENCH_DB_PATH` > `./llmbench.db`.
 
-`serve` prints the resolved database path, dashboard URL, and whether it is starting the web app in development or production mode. It uses production mode when `apps/web/.next` exists, otherwise it starts the Next.js dev server. If you run the CLI outside the monorepo layout, set `LLMBENCH_WEB_DIR` to the web app directory.
+`serve` prints the resolved database path, dashboard URL, and whether it is starting the web app in development or production mode. It uses production mode when `apps/web/.next` exists, otherwise it starts the Next.js dev server. If you run the CLI outside the monorepo layout, pass `--web-dir` or set `LLMBENCH_WEB_DIR` to the web app directory.
 
 ```bash
 LLMBENCH_DB_PATH=./team-evals.db llmbench serve
+llmbench serve --web-dir ./apps/web --db ./studio.db -p 8080
 LLMBENCH_WEB_DIR=./apps/web llmbench serve --db ./studio.db -p 8080
 ```
 
