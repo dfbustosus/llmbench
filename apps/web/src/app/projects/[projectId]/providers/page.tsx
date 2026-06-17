@@ -23,6 +23,21 @@ interface ProviderSummary {
 	config?: Partial<ProviderConfig>;
 }
 
+type ConnectionTestStatus =
+	| { status: "testing"; message: string }
+	| { status: "success"; message: string; output?: string }
+	| { status: "error"; message: string };
+
+function connectionStatusClass(status: ConnectionTestStatus["status"]): string {
+	if (status === "success") {
+		return "border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-300";
+	}
+	if (status === "error") {
+		return "border-destructive/40 bg-destructive/10 text-destructive";
+	}
+	return "border-muted bg-muted/50 text-muted-foreground";
+}
+
 export default function ProvidersPage({ params }: { params: Promise<{ projectId: string }> }) {
 	const { projectId } = use(params);
 	const projectQuery = trpc.project.getById.useQuery(projectId);
@@ -35,6 +50,9 @@ export default function ProvidersPage({ params }: { params: Promise<{ projectId:
 	const [editProvider, setEditProvider] = useState<ProviderSummary | null>(null);
 	const [deleteProviderId, setDeleteProviderId] = useState<string | null>(null);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
+	const [connectionStatuses, setConnectionStatuses] = useState<
+		Record<string, ConnectionTestStatus>
+	>({});
 
 	const utils = trpc.useUtils();
 	const deleteMutation = trpc.provider.delete.useMutation({
@@ -45,6 +63,30 @@ export default function ProvidersPage({ params }: { params: Promise<{ projectId:
 			setDeleteError(null);
 		},
 		onError: (err) => setDeleteError(err.message),
+	});
+	const testConnectionMutation = trpc.provider.testConnection.useMutation({
+		onMutate: ({ id }) => {
+			setConnectionStatuses((current) => ({
+				...current,
+				[id]: { status: "testing", message: "Testing connection..." },
+			}));
+		},
+		onSuccess: (result, { id }) => {
+			setConnectionStatuses((current) => ({
+				...current,
+				[id]: {
+					status: "success",
+					message: `Connected in ${result.latencyMs}ms`,
+					output: result.output || undefined,
+				},
+			}));
+		},
+		onError: (err, { id }) => {
+			setConnectionStatuses((current) => ({
+				...current,
+				[id]: { status: "error", message: err.message },
+			}));
+		},
 	});
 
 	return (
@@ -80,61 +122,88 @@ export default function ProvidersPage({ params }: { params: Promise<{ projectId:
 			</div>
 
 			<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-				{providers.map((provider) => (
-					<Card key={provider.id}>
-						<CardHeader>
-							<div className="flex items-start justify-between gap-3">
-								<div>
-									<CardTitle>{provider.name}</CardTitle>
-									<CardDescription>{provider.model}</CardDescription>
-								</div>
-								<Badge variant="secondary">{provider.type}</Badge>
-							</div>
-						</CardHeader>
-						<CardContent className="space-y-4">
-							<div className="space-y-1 text-sm text-muted-foreground">
-								{provider.config?.baseUrl && <p>Base URL: {provider.config.baseUrl}</p>}
-								{provider.config?.temperature != null && (
-									<p>Temperature: {provider.config.temperature}</p>
-								)}
-								{provider.config?.maxTokens != null && (
-									<p>Max tokens: {provider.config.maxTokens}</p>
-								)}
-								{provider.config?.topP != null && <p>Top P: {provider.config.topP}</p>}
-								<div className="flex flex-wrap gap-2 pt-1">
-									{provider.config?.stream && <Badge variant="outline">stream</Badge>}
-									{provider.config?.responseFormat?.type === "json_object" && (
-										<Badge variant="outline">json mode</Badge>
-									)}
-								</div>
-							</div>
+				{providers.map((provider) => {
+					const connectionStatus = connectionStatuses[provider.id];
+					const isTestingConnection = connectionStatus?.status === "testing";
 
-							<div className="flex gap-2">
-								<Button
-									variant="outline"
-									size="sm"
-									disabled={provider.type === "custom"}
-									onClick={() => setEditProvider(provider)}
-								>
-									Edit
-								</Button>
-								<Button
-									variant="ghost"
-									size="sm"
-									className="text-destructive hover:text-destructive"
-									onClick={() => setDeleteProviderId(provider.id)}
-								>
-									Delete
-								</Button>
-							</div>
-							{provider.type === "custom" && (
-								<p className="text-xs text-muted-foreground">
-									Custom providers are registered from SDK/CLI code and cannot be edited here.
-								</p>
-							)}
-						</CardContent>
-					</Card>
-				))}
+					return (
+						<Card key={provider.id}>
+							<CardHeader>
+								<div className="flex items-start justify-between gap-3">
+									<div>
+										<CardTitle>{provider.name}</CardTitle>
+										<CardDescription>{provider.model}</CardDescription>
+									</div>
+									<Badge variant="secondary">{provider.type}</Badge>
+								</div>
+							</CardHeader>
+							<CardContent className="space-y-4">
+								<div className="space-y-1 text-sm text-muted-foreground">
+									{provider.config?.baseUrl && <p>Base URL: {provider.config.baseUrl}</p>}
+									{provider.config?.temperature != null && (
+										<p>Temperature: {provider.config.temperature}</p>
+									)}
+									{provider.config?.maxTokens != null && (
+										<p>Max tokens: {provider.config.maxTokens}</p>
+									)}
+									{provider.config?.topP != null && <p>Top P: {provider.config.topP}</p>}
+									<div className="flex flex-wrap gap-2 pt-1">
+										{provider.config?.stream && <Badge variant="outline">stream</Badge>}
+										{provider.config?.responseFormat?.type === "json_object" && (
+											<Badge variant="outline">json mode</Badge>
+										)}
+									</div>
+								</div>
+
+								<div className="flex gap-2">
+									<Button
+										variant="secondary"
+										size="sm"
+										disabled={provider.type === "custom" || isTestingConnection}
+										onClick={() => testConnectionMutation.mutate({ id: provider.id })}
+									>
+										{isTestingConnection ? "Testing..." : "Test"}
+									</Button>
+									<Button
+										variant="outline"
+										size="sm"
+										disabled={provider.type === "custom"}
+										onClick={() => setEditProvider(provider)}
+									>
+										Edit
+									</Button>
+									<Button
+										variant="ghost"
+										size="sm"
+										className="text-destructive hover:text-destructive"
+										onClick={() => setDeleteProviderId(provider.id)}
+									>
+										Delete
+									</Button>
+								</div>
+								{provider.type === "custom" && (
+									<p className="text-xs text-muted-foreground">
+										Custom providers are registered from SDK/CLI code and cannot be edited here.
+									</p>
+								)}
+								{connectionStatus && (
+									<div
+										className={`rounded-md border p-3 text-sm ${connectionStatusClass(
+											connectionStatus.status,
+										)}`}
+									>
+										<p className="font-medium">{connectionStatus.message}</p>
+										{connectionStatus.status === "success" && connectionStatus.output && (
+											<p className="mt-1 line-clamp-2 break-words text-xs opacity-80">
+												{connectionStatus.output}
+											</p>
+										)}
+									</div>
+								)}
+							</CardContent>
+						</Card>
+					);
+				})}
 			</div>
 
 			{providers.length === 0 && !providersQuery.isLoading && (
