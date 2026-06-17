@@ -96,12 +96,43 @@ describe("findWebAppDirectory", () => {
 		).toBe(webDir);
 	});
 
+	it("uses --web-dir before LLMBENCH_WEB_DIR", () => {
+		const root = createTempDir();
+		createWebPackage(root, "env-dashboard");
+		const webDir = createWebPackage(root, "cli-dashboard");
+
+		expect(
+			findWebAppDirectory(
+				createCommandImportMetaUrl(root),
+				root,
+				{ LLMBENCH_WEB_DIR: "env-dashboard" },
+				"cli-dashboard",
+			),
+		).toBe(webDir);
+	});
+
 	it("fails clearly for an invalid LLMBENCH_WEB_DIR", () => {
 		const root = createTempDir();
 
 		expect(() =>
 			findWebAppDirectory(createCommandImportMetaUrl(root), root, { LLMBENCH_WEB_DIR: "missing" }),
 		).toThrow("LLMBENCH_WEB_DIR does not point to a web package");
+	});
+
+	it("fails clearly for an invalid --web-dir", () => {
+		const root = createTempDir();
+
+		expect(() =>
+			findWebAppDirectory(createCommandImportMetaUrl(root), root, {}, "missing"),
+		).toThrow("--web-dir does not point to a web package");
+	});
+
+	it("fails clearly when no web package can be found", () => {
+		const root = createTempDir();
+
+		expect(() => findWebAppDirectory(createCommandImportMetaUrl(root), root, {})).toThrow(
+			"Could not locate the LLMBench web dashboard package",
+		);
 	});
 });
 
@@ -140,6 +171,19 @@ describe("createServePlan", () => {
 			script: "dev",
 			url: "http://localhost:8080",
 		});
+	});
+
+	it("uses the explicit web directory in the startup plan", () => {
+		const root = createTempDir();
+		const webDir = createWebPackage(root, "dashboard");
+		const plan = createServePlan(
+			{ port: "8080", webDir: "dashboard" },
+			{},
+			root,
+			createCommandImportMetaUrl(root),
+		);
+
+		expect(plan.webDir).toBe(webDir);
 	});
 });
 
